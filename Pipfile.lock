@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "b54459b831e685ab28ed6c77f963d141820e0d9fc604fadd57bb7622c2ac8e1a"
+            "sha256": "128e8e315f46e6981f09a177f9696752f7f8365b0ba07e1e3776439672e5d0f0"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -75,18 +75,18 @@
         },
         "parso": {
             "hashes": [
-                "sha256:4580328ae3f548b358f4901e38c0578229186835f0fa0846e47369796dd5bcc9",
-                "sha256:68406ebd7eafe17f8e40e15a84b56848eccbf27d7c1feb89e93d8fca395706db"
+                "sha256:17cc2d7a945eb42c3569d4564cdf49bde221bc2b552af3eca9c1aad517dcdd33",
+                "sha256:2e9574cb12e7112a87253e14e2c380ce312060269d04bd018478a3c92ea9a376"
             ],
-            "version": "==0.3.4"
+            "version": "==0.4.0"
         },
         "pexpect": {
             "hashes": [
-                "sha256:2a8e88259839571d1251d278476f3eec5db26deb73a70be5ed5dc5435e418aba",
-                "sha256:3fbd41d4caf27fa4a377bfd16fef87271099463e6fa73e92a52f92dfee5d425b"
+                "sha256:2094eefdfcf37a1fdbfb9aa090862c1a4878e5c7e0e7e7088bdb511c558e5cd1",
+                "sha256:9e2c1fd0e6ee3a49b28f95d4b33bc389c89b20af6a1255906e90ff1262ce62eb"
             ],
             "markers": "sys_platform != 'win32'",
-            "version": "==4.6.0"
+            "version": "==4.7.0"
         },
         "pickleshare": {
             "hashes": [
@@ -171,12 +171,8 @@
             "version": "==1.0.4"
         },
         "tinymongo": {
-            "hashes": [
-                "sha256:1bbbb8784386ea0ab079cab66b6b182390d9c825ca33b1abce4a375cccb828cf",
-                "sha256:733de042ec6fcaf2630bfd76761be1c084f503ceff1c05621c7be47481d86ba3"
-            ],
-            "index": "pypi",
-            "version": "==0.2.0"
+            "git": "https://github.com/sunbit/tinymongo.git",
+            "ref": "6033d8fd3a77d4daf796fdfb595cc5ccb09c9106"
         },
         "traitlets": {
             "hashes": [

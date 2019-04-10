@@ -11,7 +11,7 @@ tabulate = "*"
 ipdb = "*"
 docopt = "*"
 pyyaml = "*"
-tinymongo = "*"
+tinymongo = {git = "https://github.com/sunbit/tinymongo.git"}
 tinydb-serialization = "*"
 
 [requires]
