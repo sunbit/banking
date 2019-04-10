@@ -50,7 +50,7 @@ def login(browser, username, password):
     browser.find_element_by_css_selector('#t-main-content', visible=True, timeout=20)
 
 
-def get_account_movements(browser, account_number, from_date, to_date):
+def get_account_transactions(browser, account_number, from_date, to_date):
 
     browser.get('https://web.bbva.es/index.html')
 
@@ -87,7 +87,7 @@ def get_account_movements(browser, account_number, from_date, to_date):
     # Iterate trough all the infinite scrolling pagination
     while still_have_results:
         while intercepted_responses_count == len(intercepted_responses):
-            # Inner Loop to wait for the page to load and push the new movements
+            # Inner Loop to wait for the page to load and push the new transactions
             browser.find_element_by_id("interceptedResponse")
             intercepted_json = browser.execute_script("return JSON.stringify(document.getElementById('interceptedResponse').responses)")
             intercepted_responses = json.loads(intercepted_json)
@@ -107,11 +107,11 @@ def get_account_movements(browser, account_number, from_date, to_date):
 
     # Results come from newer to older, we want it the other way around, that why we reverse them
     results = list(reversed(list((chain.from_iterable([response['accountTransactions'] for response in intercepted_responses if response is not None])))))
-    log('Found {} movements'.format(len(results)))
+    log('Found {} transactions'.format(len(results)))
     return results
 
 
-def get_credit_card_movements(browser, card_number, from_date, to_date):
+def get_credit_card_transactions(browser, card_number, from_date, to_date):
 
     browser.get('https://web.bbva.es/index.html')
 
@@ -144,7 +144,7 @@ def get_credit_card_movements(browser, card_number, from_date, to_date):
     # Iterate trough all the infinite scrolling pagination
     while still_have_results:
         while intercepted_responses_count == len(intercepted_responses):
-            # Inner Loop to wait for the page to load and push the new movements
+            # Inner Loop to wait for the page to load and push the new transactions
             browser.find_element_by_id("interceptedResponse")
             intercepted_json = browser.execute_script("return JSON.stringify(document.getElementById('interceptedResponse').responses)")
             intercepted_responses = json.loads(intercepted_json)
@@ -160,5 +160,5 @@ def get_credit_card_movements(browser, card_number, from_date, to_date):
 
     # Results come from newer to older, we want it the other way around, that why we reverse them
     results = list(reversed(list(chain.from_iterable([response['cardsTransactions'] for response in intercepted_responses if response is not None]))))
-    log('Found {} movements'.format(len(results)))
+    log('Found {} transactions'.format(len(results)))
     return results

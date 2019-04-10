@@ -24,28 +24,34 @@ def load_module(bank_id):
     return importlib.import_module('bank.{}'.format(bank_id))
 
 
-def parse_account_movements(bank_module, bank_config, account_config, movements):
+def parse_account_transactions(bank_module, bank_config, account_config, transactions):
     return list(
-        map(
-            partial(
-                bank_module.parse_account_movement,
-                bank_config,
-                account_config
-            ),
-            movements
+        filter(
+            bool,
+            map(
+                partial(
+                    bank_module.parse_account_transaction,
+                    bank_config,
+                    account_config
+                ),
+                transactions
+            )
         )
     )
 
 
-def parse_credit_card_movements(bank_module, bank_config, account_config, credit_card_config, movements):
+def parse_credit_card_transactions(bank_module, bank_config, account_config, credit_card_config, transactions):
     return list(
-        map(
-            partial(
-                bank_module.parse_credit_card_movement,
-                bank_config,
-                account_config,
-                credit_card_config
-            ),
-            movements
+        filter(
+            bool,
+            map(
+                partial(
+                    bank_module.parse_credit_card_transaction,
+                    bank_config,
+                    account_config,
+                    credit_card_config
+                ),
+                transactions
+            )
         )
     )

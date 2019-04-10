@@ -165,11 +165,11 @@ _rules = [
     domain.Rule(
         conditions=[
             domain.MatchTransactionType(datatypes.TransactionType.RECEIVED_TRANSFER),
-            domain.MatchDetail('sender_account_number', '21000420510200148152')
+            domain.MatchDetail('origin_account_number', '21000420510200148152')
         ],
         actions=[
             domain.setIssuer("Fundació Escola Vedruna"),
-            domain.setComment("Pagament activitats extres: {details[description]}")
+            domain.setComment("Pagament activitats extres: {details[concept]}")
         ]
     ),
     domain.Rule(
@@ -185,7 +185,7 @@ _rules = [
     domain.Rule(
         conditions=[
             domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchDetail('librado', 'Nuria'),
+            domain.MatchDetail('drawee', 'Nuria'),
             domain.MatchKeywords(['SIMYO'], domain.AND)
         ],
         actions=[
@@ -195,7 +195,7 @@ _rules = [
     domain.Rule(
         conditions=[
             domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchDetail('librado', 'Carles'),
+            domain.MatchDetail('drawee', 'Carles'),
             domain.MatchKeywords(['SIMYO'], domain.AND)
         ],
         actions=[
@@ -226,7 +226,7 @@ _rules = [
     domain.Rule(
         conditions=[
             domain.MatchTransactionType(datatypes.TransactionType.PURCHASE),
-            domain.MatchFieldMulti('destination', ['Amz*', 'Amzn', 'Amazon', ], domain.OR)
+            domain.MatchFieldMulti('destination', ['Amz\*', 'Amzn', 'Amazon', ], domain.OR)
         ],
         actions=[
             domain.setRecipient("Amazon"),
@@ -236,7 +236,7 @@ _rules = [
     domain.Rule(
         conditions=[
             domain.MatchTransactionType(datatypes.TransactionType.PURCHASE_RETURN),
-            domain.MatchFieldMulti('source', ['Amz*', 'Amzn', 'Amazon', ], domain.OR)
+            domain.MatchFieldMulti('source', ['Amz\*', 'Amzn', 'Amazon', ], domain.OR)
         ],
         actions=[
             domain.setIssuer("Amazon"),
@@ -270,8 +270,7 @@ _rules = [
         ],
         actions=[
             domain.setTag("Bizum"),
-            domain.setComment("{details[concepto]}", regex=r'\/([^\/]+)$', regex_group=0)
-
+            domain.setComment("{details[concept]}", regex=r'\/([^\/]+)$', regex_group=0)
         ]
     ),
 
@@ -280,7 +279,7 @@ _rules = [
     domain.Rule(
         conditions=[
             domain.MatchTransactionType(datatypes.TransactionType.PURCHASE),
-            domain.MatchFieldMulti('destination', ['E\.S\.', 'esclatoil'], domain.OR)
+            domain.MatchFieldMulti('destination', ['E\.S\.\s+', 'esclatoil'], domain.OR)
         ],
         actions=[
             domain.setCategory("Gasoil")

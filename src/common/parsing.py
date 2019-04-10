@@ -48,6 +48,9 @@ def get_nested_item(dictionary, xpath, default=None):
         return reduce(getitem, xpath.split('.'), dictionary)
     except TypeError:
         return default
+    except IndexError:
+        # in case we do a xxx.[0].fsdf and the aray is not there
+        return default
     except AttributeError:
         return default
 
@@ -62,45 +65,10 @@ def extract_keywords(literals):
     return list(filter_single_chars)
 
 
-def extract_details(movement, detail_specs):
-
-    def get_value(detail):
-        value = get_nested_item(movement, detail.item_path)
-        if value is None:
-            return None
-
-        if detail.regex is not None:
-            match = re.search(detail.regex, value)
-            return match.groups()[0] if match else None
-        else:
-            return value
-
-    values = filter(
-        lambda detail: detail[1] is not None,
-        zip(
-            map(lambda detail: detail.detail_id, detail_specs),
-            map(
-                get_value,
-                detail_specs
-            )
-        )
-    )
-
-    return dict(set(values))
-
-
 def extract_literals(movement, field_list):
-    def unrolled_field_list():
-        for field in field_list:
-            if '[]' in field:
-                for i in range(len(get_nested_item(movement, field.split('.[]')[0]))):
-                    yield field.replace('[]', '[{}]'.format(i))
-            else:
-                yield field
-
     literals = map(
         partial(get_nested_item, movement),
-        unrolled_field_list()
+        field_list
     )
 
     return literals

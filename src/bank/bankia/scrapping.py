@@ -38,7 +38,7 @@ def login(browser, username, password):
         log('No popups found')
 
 
-def get_account_movements(browser, account_number, from_date, to_date):
+def get_account_transactions(browser, account_number, from_date, to_date):
 
     log('Loading account list page')
     browser.get('https://www.bankia.es/oficina/particulares/#/cuentas')
@@ -81,7 +81,7 @@ def get_account_movements(browser, account_number, from_date, to_date):
     # Iterate trough all the infinite scrolling pagination
     while still_have_results:
         while intercepted_responses_count == len(intercepted_responses):
-            # Inner Loop to wait for the page to load and push the new movements
+            # Inner Loop to wait for the page to load and push the new transactions
 
             # This scrolling command is just a visual debug aid
             browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -108,11 +108,11 @@ def get_account_movements(browser, account_number, from_date, to_date):
 
     # Results come from newer to older, we want it the other way around, that why we reverse them
     results = list(reversed(list(chain.from_iterable([response['movimientos'] for response in intercepted_responses if response is not None]))))
-    log('Found {} movements'.format(len(results)))
+    log('Found {} transactions'.format(len(results)))
     return results
 
 
-def get_credit_card_movements(browser, card_number, from_date, to_date):
+def get_credit_card_transactions(browser, card_number, from_date, to_date):
 
     log('Open dedicated account page')
     browser.get('https://www.bankia.es/oficina/particulares/#/tarjetas/mis-tarjetas')
@@ -158,7 +158,7 @@ def get_credit_card_movements(browser, card_number, from_date, to_date):
     # Iterate trough all the infinite scrolling pagination
     while still_have_results:
         while intercepted_responses_count == len(intercepted_responses):
-            # Inner Loop to wait for the page to load and push the new movements
+            # Inner Loop to wait for the page to load and push the new transactions
 
             # The  scrolling command is just a visual debug aid
             browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -179,5 +179,5 @@ def get_credit_card_movements(browser, card_number, from_date, to_date):
 
     # results already sorted from older to newer, no need to reverse them
     results = list(chain.from_iterable([response['movimientosTarjeta'] for response in intercepted_responses if response is not None]))
-    log('Found {} movements'.format(len(results)))
+    log('Found {} transactions'.format(len(results)))
     return results

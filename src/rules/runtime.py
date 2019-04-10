@@ -1,16 +1,16 @@
 from functools import partial
 
-from .io import apply_rules_to_movement
+from .io import apply_rules_to_transaction
 
 
-def apply(rules, movements):
+def apply(rules, transactions):
     return list(
         map(
             partial(
-                apply_rules_to_movement,
+                apply_rules_to_transaction,
                 rules
             ),
-            movements
+            transactions
         )
     )
 

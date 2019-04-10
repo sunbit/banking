@@ -57,13 +57,18 @@ class CardConfig:
 
 
 @dataclass
-class TransactionSubject:
-    name: str
+class UnknownSubject:
+    pass
 
 
 @dataclass
-class UnknownSubject(TransactionSubject):
+class UnknownWallet:
     pass
+
+
+@dataclass
+class TransactionSubject:
+    name: str
 
 
 @dataclass
@@ -116,16 +121,6 @@ class Recipient(TransactionSubject):
 class Wallet(TransactionSubject):
     pass
 
-NO_DEFAULT = object()
-
-
-@dataclass
-class DetailSpec():
-    detail_id: str
-    item_path: str
-    default: object = "NO_DEFAULT"
-    regex: object = None
-
 
 @dataclass
 class ModifiedFlags():
@@ -139,7 +134,7 @@ class ModifiedFlags():
 
 
 @dataclass
-class ParsedMovement():
+class ParsedTransaction():
     transaction_id: str
     type: TransactionType
     currency: str
@@ -149,6 +144,7 @@ class ParsedMovement():
     transaction_date: str
     source: TransactionSubject
     destination: TransactionSubject
+    card: Card
     details: dict
     keywords: list
     comment: str
@@ -158,7 +154,7 @@ class ParsedMovement():
 
 
 @dataclass
-class Movement():
+class Transaction():
     transaction_id: str
     type: TransactionType
     currency: str
@@ -168,6 +164,7 @@ class Movement():
     transaction_date: str
     source: TransactionSubject
     destination: TransactionSubject
+    card: Card
     details: dict
     keywords: list
     comment: str

@@ -1,2 +1,2 @@
-from .scrapping import login, get_account_movements, get_credit_card_movements
-from .parsing import parse_account_movement, parse_credit_card_movement
+from .scrapping import login, get_account_transactions, get_credit_card_transactions
+from .parsing import parse_account_transaction, parse_credit_card_transaction

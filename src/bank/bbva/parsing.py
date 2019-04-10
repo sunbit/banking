@@ -1,31 +1,14 @@
-from datatypes import TransactionType, TransactionDirection, ParsedMovement, DetailSpec, ModifiedFlags
-from datatypes import Bank, Account, Card
-from common.parsing import extract_literals, extract_keywords, extract_details
+from itertools import chain
+
+import re
+
+from datatypes import TransactionType, TransactionDirection, ParsedTransaction, ModifiedFlags
+from datatypes import Bank, Account, Card, UnknownSubject, UnknownWallet
+from common.parsing import extract_literals, extract_keywords, get_nested_item
 
 import datatypes
 
-
-DETAIL_SPECS = [
-    DetailSpec('transaction_id', 'id'),
-    DetailSpec('transaction_type', 'scheme.subCategory.id'),
-    DetailSpec('sender_account_number', 'wireTransactionDetail.sender.account.formats.ccc'),
-    DetailSpec('sender_name', 'wireTransactionDetail.sender.person.name'),
-    DetailSpec('receiver_name', 'wireTransactionDetail.sender.person.name'),
-    DetailSpec('purchase_shop_name', 'shop.name'),
-    DetailSpec('purchase_shop_name', 'cardTransactionDetail.shop.name'),
-    DetailSpec('purchase_shop_name', 'humanConceptName'),
-    DetailSpec('purchase_card_number', 'origin.panCode'),
-    DetailSpec('purchase_card_number', 'origin.detailSourceKey', regex=r'(\d+)'),
-    DetailSpec('creditor_name', 'billTransactionDetail.creditor.name'),
-    DetailSpec('creditor_name', 'humanConceptName'),
-    DetailSpec('description', 'humanExtendedConceptName'),
-    DetailSpec('receipt_concept', 'billTransactionDetail.extendedBillConceptName'),
-    DetailSpec('receipt_concept', 'extendedName'),
-    DetailSpec('return_reason', 'billTransactionDetail.extendedIntentionName')
-
-]
-
-LITERAL_FIELDS = [
+KEYWORD_FIELDS = [
     'name',
     'humanConceptName',
     'concept.name',
@@ -37,9 +20,9 @@ LITERAL_FIELDS = [
 ]
 
 
-def get_type(details, movement_direction):
+def get_type(transaction_code, transation_direction):
     """
-        ipdb> pp(dict(set([(b['id'], b['name']) for b in [a['scheme']['subCategory'] for a in raw_movements]])))
+        ipdb> pp(dict(set([(b['id'], b['name']) for b in [a['scheme']['subCategory'] for a in raw_transactions]])))
 
         {'0017': 'PAGO CON TARJETA',
          '0114': 'INGRESO POR NOMINA O PENSION',
@@ -47,132 +30,205 @@ def get_type(details, movement_direction):
          '0054': 'OTROS',
          '0058': 'PAGO DE ADEUDO DIRECTO SEPA',
          '0060': 'RECIBO TARJETA CRÉDITO',
-         '0140': 'ABONO'
          '0149': 'TRANSFERENCIA RECIBIDA'
          '0064': 'TRANSFERENCIA REALIZADA'}
-    """
-    # If we need more detail use this:
-    # type_code = movement['concept']['id']
 
-    type_code = details['transaction_type']
+    If we need more detail, like in case of OTROS:
+
+    code will came from transaction['concept']['id']
+
+        { "00200": "RET. EFECTIVO  A DEBITO CON TARJ. EN CAJERO. AUT."
+          "00400": "COMPRA BBVA WALLET"
+        }
+    """
 
     PAYCHECK = ['0114']
-    PURCHASE = ['0017']
+    PURCHASE = ['0017', '00400']
     TRANSFER = ['0149', '0064']
-    WITHDRAWAL = ['0054', '0022']
-    DOMICILED_RECEIPT = ['0058', '0140']
+    WITHDRAWAL = ['0022', '00200']
+    DOMICILED_RECEIPT = ['0058']
     CREDIT_CARD_INVOICE = ['0060']
 
-    if type_code in PURCHASE:
+    if transaction_code in PURCHASE:
         return {
             TransactionDirection.CHARGE: TransactionType.PURCHASE,
             TransactionDirection.INCOME: None
-        }.get(movement_direction)
+        }.get(transation_direction)
 
-    if type_code in TRANSFER:
+    if transaction_code in TRANSFER:
         return {
             TransactionDirection.CHARGE: TransactionType.ISSUED_TRANSFER,
             TransactionDirection.INCOME: TransactionType.RECEIVED_TRANSFER
-        }.get(movement_direction)
+        }.get(transation_direction)
 
-    if type_code in PAYCHECK:
+    if transaction_code in PAYCHECK:
         return {
             TransactionDirection.CHARGE: None,
             TransactionDirection.INCOME: TransactionType.RECEIVED_TRANSFER
-        }.get(movement_direction)
+        }.get(transation_direction)
 
-    if type_code in WITHDRAWAL:
+    if transaction_code in WITHDRAWAL:
         return {
             TransactionDirection.CHARGE: TransactionType.ATM_WITHDRAWAL,
             TransactionDirection.INCOME: None
-        }.get(movement_direction)
+        }.get(transation_direction)
 
-    if type_code in DOMICILED_RECEIPT:
+    if transaction_code in DOMICILED_RECEIPT:
         return {
             TransactionDirection.CHARGE: TransactionType.DOMICILED_RECEIPT,
             TransactionDirection.INCOME: TransactionType.RETURN_DEPOSIT
-        }.get(movement_direction)
+        }.get(transation_direction)
 
-    if type_code in CREDIT_CARD_INVOICE:
+    if transaction_code in CREDIT_CARD_INVOICE:
         return {
             TransactionDirection.CHARGE: TransactionType.CREDIT_CARD_INVOICE,
             TransactionDirection.INCOME: None
-        }.get(movement_direction)
+        }.get(transation_direction)
 
 
-def get_source(details, movement_type):
-    if movement_type is TransactionType.RECEIVED_TRANSFER:
-        return datatypes.Issuer(details['sender_name'].title())
-    if movement_type is TransactionType.ATM_WITHDRAWAL:
+def get_source(details, transaction_type):
+
+    def safe_issuer(subject):
+        return UnknownSubject() if subject is None else datatypes.Issuer(subject)
+
+    if transaction_type is TransactionType.ATM_WITHDRAWAL:
         return details['account']
-    if movement_type is TransactionType.ISSUED_TRANSFER:
+    if transaction_type is TransactionType.ISSUED_TRANSFER:
         return details['account']
-    if movement_type is TransactionType.CREDIT_CARD_INVOICE:
+    if transaction_type is TransactionType.CREDIT_CARD_INVOICE:
         return details['account']
-    if movement_type is TransactionType.DOMICILED_RECEIPT:
+    if transaction_type is TransactionType.CREDIT_CARD_INVOICE_PAYMENT:
         return details['account']
-    if movement_type is TransactionType.RETURN_DEPOSIT:
-        return datatypes.Issuer(details['creditor_name'].title())
-    if movement_type is TransactionType.MORTAGE_RECEIPT:
+    if transaction_type is TransactionType.DOMICILED_RECEIPT:
         return details['account']
-    if movement_type is TransactionType.BANK_COMISSION:
+    if transaction_type is TransactionType.MORTAGE_RECEIPT:
         return details['account']
-    if movement_type is TransactionType.BANK_COMISSION_RETURN:
+    if transaction_type is TransactionType.BANK_COMISSION:
+        return details['account']
+    if transaction_type is TransactionType.MORTAGE_RECEIPT:
+        return details['account']
+    if transaction_type is TransactionType.BANK_COMISSION:
+        return details['account']
+    if transaction_type is TransactionType.PURCHASE:
+        return details['account']
+    if transaction_type is TransactionType.BANK_COMISSION_RETURN:
         return details['bank']
-    if movement_type is TransactionType.PURCHASE:
-        return details['card']
+    if transaction_type is TransactionType.RETURN_DEPOSIT:
+        return safe_issuer(details['creditor_name'])
+    if transaction_type is TransactionType.RECEIVED_TRANSFER:
+        return safe_issuer(details['issuer_name'])
+    if transaction_type is TransactionType.PURCHASE_RETURN:
+        return safe_issuer(details['shop_name'])
 
 
-def get_destination(details, movement_type):
-    if movement_type is TransactionType.RECEIVED_TRANSFER:
+def get_destination(details, transaction_type):
+
+    def safe_recipient(subject):
+        return UnknownSubject() if subject is None else datatypes.Recipient(subject)
+
+    if transaction_type is TransactionType.RECEIVED_TRANSFER:
         return details['account']
-    if movement_type is TransactionType.ATM_WITHDRAWAL:
-        return details['card']
-    if movement_type is TransactionType.ISSUED_TRANSFER:
-        return datatypes.Recipient(details['receiver_name'].title())
-    if movement_type is TransactionType.CREDIT_CARD_INVOICE:
-        return details['bank']
-    if movement_type is TransactionType.MORTAGE_RECEIPT:
-        return details['bank']
-    if movement_type is TransactionType.BANK_COMISSION:
-        return details['bank']
-    if movement_type is TransactionType.BANK_COMISSION_RETURN:
+    if transaction_type is TransactionType.BANK_COMISSION_RETURN:
         return details['account']
-    if movement_type is TransactionType.DOMICILED_RECEIPT:
-        return datatypes.Recipient(details['creditor_name'].title())
-    if movement_type is TransactionType.RETURN_DEPOSIT:
+    if transaction_type is TransactionType.RETURN_DEPOSIT:
         return details['account']
-    if movement_type is TransactionType.PURCHASE:
-        return datatypes.Recipient(details['purchase_shop_name'].title())
+    if transaction_type is TransactionType.PURCHASE_RETURN:
+        return details['account']
+    if transaction_type is TransactionType.ATM_WITHDRAWAL:
+        return UnknownWallet()
+    if transaction_type is TransactionType.CREDIT_CARD_INVOICE:
+        return details['bank']
+    if transaction_type is TransactionType.MORTAGE_RECEIPT:
+        return details['bank']
+    if transaction_type is TransactionType.BANK_COMISSION:
+        return details['bank']
+    if transaction_type is TransactionType.CREDIT_CARD_INVOICE_PAYMENT:
+        return details['bank']
+    if transaction_type is TransactionType.ISSUED_TRANSFER:
+        return safe_recipient(details['beneficiary'])
+    if transaction_type is TransactionType.DOMICILED_RECEIPT:
+        return safe_recipient(details['creditor_name'])
+    if transaction_type is TransactionType.PURCHASE:
+        return safe_recipient(details['shop_name'])
 
 
-def get_comments(details, movement_type):
-    if movement_type is TransactionType.RECEIVED_TRANSFER:
-        return details['description'].title()
-    if movement_type is TransactionType.ISSUED_TRANSFER:
-        return details['description'].title()
-    if movement_type is TransactionType.RETURN_DEPOSIT:
-        return details['return_reason'].title()
-    if movement_type is TransactionType.DOMICILED_RECEIPT:
-        concept = details.get('receipt_concept')
-        if concept is not None:
-            return
+def get_account_transaction_details(transaction, transaction_type):
+
+    details = {}
+
+    def set_detail(fieldname, xpath_string_or_list, fmt=None, default=None):
+        nonlocal details
+
+        xpath_list = xpath_string_or_list if isinstance(xpath_string_or_list, list) else [xpath_string_or_list]
+
+        for xpath in xpath_list:
+            value = get_nested_item(transaction, xpath)
+            formatted_value = None if value is None else (value if fmt is None else fmt(value))
+            if formatted_value is not None:
+                details[fieldname] = formatted_value
+                return
+
+        details[fieldname] = default
+
+    def title(str):
+        return str.title()
+
+    def capture(regex, group):
+        def wrap(value):
+            match = re.search(regex, value)
+            return match.groups()[0] if match else None
+        return wrap
+
+    if transaction_type is TransactionType.PURCHASE:
+        set_detail('shop_name', ['comments.[0].text', 'cardTransactionDetail.shop.name', 'humanConceptName'], fmt=title)
+        set_detail('card_number', 'origin.panCode')
+        set_detail('activity', 'cardTransactionDetail.shop.businessActivity.name')
+
+    if transaction_type is TransactionType.ATM_WITHDRAWAL:
+        set_detail('card_number', 'origin.detailSourceKey', fmt=capture(r'(\d+)', 0))
+        set_detail('atm_name', ['cardTransactionDetail.shop.name', 'extendedName'])
+
+    if transaction_type is TransactionType.ISSUED_TRANSFER:
+        set_detail('beneficiary', 'wireTransactionDetail.sender.person.name', fmt=title)
+        set_detail('concept', 'humanExtendedConceptName')
+
+    if transaction_type is TransactionType.RECEIVED_TRANSFER:
+        set_detail('origin_account_number', 'wireTransactionDetail.sender.account.formats.ccc')
+        set_detail('issuer_name', 'wireTransactionDetail.sender.person.name')
+        set_detail('concept', 'humanExtendedConceptName')
+
+    if transaction_type is TransactionType.DOMICILED_RECEIPT:
+        set_detail('creditor_name', ['billTransactionDetail.creditor.name'])
+        set_detail('concept', ['billTransactionDetail.extendedBillConceptName', 'extendedName'], fmt=title)
+
+    if transaction_type is TransactionType.RETURN_DEPOSIT:
+        set_detail('return_reason', 'billTransactionDetail.extendedIntentionName', fmt=title)
+    return details
 
 
-def get_details(movement, bank_config, account_config):
-    details = extract_details(movement, DETAIL_SPECS)
+def get_card_transaction_details(transaction, transaction_type):
 
-    details['account'] = Account.from_config(account_config)
-    details['bank'] = Bank.from_config(bank_config)
+    details = {}
 
-    if 'purchase_card_number' in details:
-        for card in account_config.cards:
-            if card.number == details['purchase_card_number']:
-                details['card'] = Card.from_config(card)
-                break
-        if 'card' not in details:
-            # Possibly an old card no longer registered
-            details['card'] = Card('Unknown card', details['purchase_card_number'])
+    def set_detail(fieldname, xpath_string_or_list, fmt=None, default=None):
+        nonlocal details
+
+        xpath_list = xpath_string_or_list if isinstance(xpath_string_or_list, list) else [xpath_string_or_list]
+
+        for xpath in xpath_list:
+            value = get_nested_item(transaction, xpath)
+            formatted_value = None if value is None else (value if fmt is None else fmt(value))
+            if formatted_value is not None:
+                details[fieldname] = formatted_value
+                return
+
+        details[fieldname] = default
+
+    def title(str):
+        return str.title()
+
+    if transaction_type is TransactionType.PURCHASE:
+        set_detail('shop_name', 'shop.name', fmt=title)
 
     return details
 
@@ -181,58 +237,109 @@ def decode_date(date):
     return date.split('T')[0]
 
 
-def parse_account_movement(bank_config, account_config, movement):
-    amount = movement['amount']['amount']
-    movement_direction = TransactionDirection.CHARGE if amount < 0 else TransactionDirection.INCOME
+def get_card(account_config, card_number):
+    if card_number is None:
+        return None
 
-    details = get_details(movement, bank_config, account_config)
-    movement_type = get_type(details, movement_direction)
+    for card in account_config.cards:
+        if card.number == card_number:
+            return Card.from_config(card)
 
-    return ParsedMovement(
-        transaction_id=movement['id'],
-        type=movement_type,
-        currency=movement['amount']['currency']['code'],
+    # Possibly an old card no longer registered
+    return Card('Unknown card', card_number)
+
+
+def get_comment(details, transaction_type):
+    if transaction_type in [TransactionType.ISSUED_TRANSFER, TransactionType.RECEIVED_TRANSFER]:
+        return details['concept']
+    if transaction_type is TransactionType.RETURN_DEPOSIT:
+        return details['return_reason']
+    if transaction_type is TransactionType.DOMICILED_RECEIPT:
+        return details['concept']
+
+
+def parse_account_transaction(bank_config, account_config, transaction):
+    amount = transaction['amount']['amount']
+    transaction_code = get_nested_item(transaction, 'scheme.subCategory.id')
+
+    if transaction_code == '0054':  # "Otros ..."
+        transaction_code = get_nested_item(transaction, 'concept.id')
+
+    transation_direction = TransactionDirection.CHARGE if amount < 0 else TransactionDirection.INCOME
+    transaction_type = get_type(transaction_code, transation_direction)
+
+    details = get_account_transaction_details(transaction, transaction_type)
+    details['account'] = Account.from_config(account_config)
+    details['bank'] = Bank.from_config(bank_config)
+
+    card_number = details.pop('card_number', None)
+    used_card = get_card(account_config, card_number)
+
+    keywords = extract_keywords(
+        chain(
+            extract_literals(transaction, KEYWORD_FIELDS),
+            filter(lambda value: isinstance(value, str), details.values())
+        )
+    )
+
+    comment = get_comment(details, transaction_type)
+
+    return ParsedTransaction(
+        transaction_id=transaction['id'],
+        type=transaction_type,
+        currency=transaction['amount']['currency']['code'],
         amount=amount,
-        balance=movement['balance']['availableBalance']['amount'],
-        value_date=decode_date(movement['valueDate']),
-        transaction_date=decode_date(movement['transactionDate']),
-        source=get_source(details, movement_type),
-        destination=get_destination(details, movement_type),
+        balance=transaction['balance']['availableBalance']['amount'],
+        value_date=decode_date(transaction['valueDate']),
+        transaction_date=decode_date(transaction['transactionDate']),
+        source=get_source(details, transaction_type),
+        destination=get_destination(details, transaction_type),
+        card=used_card,
         details=details,
-        keywords=extract_keywords(extract_literals(movement, LITERAL_FIELDS)),
-        comment=get_comments(details, movement_type),
+        keywords=keywords,
+        comment=comment if comment is not None else '',
         flags=ModifiedFlags()
     )
 
 
-def parse_credit_card_movement(bank_config, account_config, card_config, movement):
-    amount = movement['amount']['amount']
-    movement_direction = TransactionDirection.CHARGE if amount < 0 else TransactionDirection.INCOME
+def parse_credit_card_transaction(bank_config, account_config, card_config, transaction):
+    amount = transaction['amount']['amount']
+    # Until we don't have more information, we assume everything card related is
+    # a purchase, forcing the code
+    transaction_code = "0017"
+    transation_direction = TransactionDirection.CHARGE if amount < 0 else TransactionDirection.INCOME
+    transaction_type = get_type(transaction_code, transation_direction)
 
-    details = get_details(movement, bank_config, account_config)
+    details = get_card_transaction_details(transaction, transaction_type)
+    details['account'] = Account.from_config(account_config)
+    details['bank'] = Bank.from_config(bank_config)
 
-    # As we are processing a concrete card, and movement doesn't have this
-    # information, we set it to be able to process all movements equally
-    details['card'] = Card.from_config(card_config)
+    # As we are processing a concrete card, and transaction doesn't have this
+    # information, we set it to be able to process all transactions equally
+    card_used = Card.from_config(card_config)
 
-    #Until we don't have more information, we assume everything card related is
-    # a purchase
-    details['transaction_type'] = "0017"
+    keywords = extract_keywords(
+        chain(
+            extract_literals(transaction, KEYWORD_FIELDS),
+            filter(lambda value: isinstance(value, str), details.values())
+        )
+    )
 
-    movement_type = get_type(details, movement_direction)
+    comment = get_comment(details, transaction_type)
 
-    return ParsedMovement(
-        transaction_id=movement['id'],
-        type=movement_type,
-        currency=movement['amount']['currency']['code'],
+    return ParsedTransaction(
+        transaction_id=transaction['id'],
+        type=transaction_type,
+        currency=transaction['amount']['currency']['code'],
         amount=amount,
         balance=None,
-        value_date=decode_date(movement['valueDate']),
-        transaction_date=decode_date(movement['transactionDate']),
-        source=get_source(details, movement_type),
-        destination=get_destination(details, movement_type),
+        value_date=decode_date(transaction['valueDate']),
+        transaction_date=decode_date(transaction['transactionDate']),
+        source=get_source(details, transaction_type),
+        destination=get_destination(details, transaction_type),
+        card=card_used,
         details=details,
-        keywords=extract_keywords(extract_literals(movement, LITERAL_FIELDS)),
-        comment=get_comments(details, movement_type),
+        keywords=keywords,
+        comment=comment if comment is not None else '',
         flags=ModifiedFlags()
     )

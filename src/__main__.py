@@ -2,9 +2,9 @@
 Banking
 
 Usage:
-  banking get <bank> (account|card) movements [options]
-  banking load <bank> (account|card) movements [options]
-  banking load <bank> (account|card) raw movements <raw-filename> [options]
+  banking get <bank> (account|card) transactions [options]
+  banking load <bank> (account|card) transactions [options]
+  banking load <bank> (account|card) raw transactions <raw-filename> [options]
   banking (-h | --help)
   banking --version
 
@@ -13,11 +13,11 @@ Options:
   --version            Show version.
   --from=<from-date>   Query start date
   --to=<to-date>       Query to date
-  --save=<filename>    Save the scrapped movements in raw format to a json file
+  --save=<filename>    Save the scrapped transactions in raw format to a json file
   --update             Update the database with the new collected records
   --debug-browser      Shows the selenium task in a browser
   --keep-browser-open  Prevent to close the selenium browser after a crash
-  --use-cache          Use cached raw movements if any
+  --use-cache          Use cached raw transactions if any
 
 """
 
@@ -43,7 +43,7 @@ import rules
 
 
 def table(records, show_balance=True):
-    headers = ['Date', 'Amount', 'Balance', 'Type', 'Category', 'Source', 'Recipient', 'Tags', 'Comment']
+    headers = ['Date', 'Amount', 'Balance', 'Type', 'Category', 'Card', 'Source', 'Recipient', 'Tags', 'Comment']
 
     if show_balance is False:
         headers.remove(headers.index('Balance'))
@@ -51,10 +51,10 @@ def table(records, show_balance=True):
     def format_destination(destination):
         if destination is None:
             return '--'
-        if isinstance(destination, datatypes.UnknownSubject):
-            return '!! {}'.format(destination.name)
-        elif isinstance(destination, datatypes.Card):
-            return '{}: {}'.format(destination.name, destination.number)
+        elif isinstance(destination, datatypes.UnknownSubject):
+            return '??'
+        elif isinstance(destination, datatypes.UnknownWallet):
+            return '??'
         else:
             return destination.name
 
@@ -71,6 +71,7 @@ def table(records, show_balance=True):
             row.append(record.balance)
         row.append(record.type.value if record.type is not None else '--')
         row.append(record.category if record.category is not None else '--')
+        row.append('{card.name}: {card.number}'.format(card=record.card) if record.card is not None else '')
         row.append(format_destination(record.source))
         row.append(format_destination(record.destination))
         row.append(', '.join(record.tags))
@@ -121,15 +122,15 @@ if __name__ == '__main__':
         )
 
         if arguments['--use-cache'] and os.path.exists(cache_filename):
-            print('> Loading raw movements from cache')
-            raw_movements = json.load(open(cache_filename))
+            print('> Loading raw transactions from cache')
+            raw_transactions = json.load(open(cache_filename))
         else:
             try:
                 browser = scrapper.new('./chromedriver', headless=headless)
                 bank_module.login(browser, bank_config.username, bank_config.password)
 
                 if source == 'account':
-                    raw_movements = bank_module.get_account_movements(
+                    raw_transactions = bank_module.get_account_transactions(
                         browser,
                         account_config.number,
                         arguments['--from'],
@@ -137,7 +138,7 @@ if __name__ == '__main__':
                     )
 
                 elif source == 'card':
-                    raw_movements = bank_module.get_credit_card_movements(
+                    raw_transactions = bank_module.get_credit_card_transactions(
                         browser,
                         credit_card_config.number,
                         arguments['--from'],
@@ -166,39 +167,40 @@ if __name__ == '__main__':
 
         for filename in files_to_write:
             with open(filename, 'w') as export_file:
-                json.dump(raw_movements, export_file, indent=4)
+                json.dump(raw_transactions, export_file, indent=4)
 
         if arguments['--update']:
             if source == 'account':
-                parsed_movements = bank.parse_account_movements(bank_module, bank_config, account_config, raw_movements)
-                processed_movements = rules.apply(rules.load(), parsed_movements)
+                parsed_transactions = bank.parse_account_transactions(bank_module, bank_config, account_config, raw_transactions)
+                processed_transactions = rules.apply(rules.load(), parsed_transactions)
                 try:
-                    database.update_account_movements(database.load(bank_config), processed_movements)
+                    database.update_account_transactions(database.load(bank_config), processed_transactions)
                 except database.DatabaseMatchError as exc:
                     print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
                     sys.exit(1)
 
     if action == 'load' and load_raw:
-        raw_movements = json.load(open(arguments['<raw-filename>']))
+        raw_transactions = json.load(open(arguments['<raw-filename>']))
 
         if source == 'account':
-            parsed_movements = bank.parse_account_movements(bank_module, bank_config, account_config, raw_movements)
+            parsed_transactions = bank.parse_account_transactions(bank_module, bank_config, account_config, raw_transactions)
 
         elif source == 'card':
-            parsed_movements = bank.parse_credit_card_movements(bank_module, bank_config, account_config, credit_card_config, raw_movements)
+            parsed_transactions = bank.parse_credit_card_transactions(bank_module, bank_config, account_config, credit_card_config, raw_transactions)
 
-        processed_movements = rules.apply(rules.load(), parsed_movements)
+        processed_transactions = rules.apply(rules.load(), parsed_transactions)
 
         at_least_one = False
-        for movement in processed_movements:
-            if None in (movement.destination, movement.source, movement.type):
+
+        for transaction in processed_transactions:
+            if None in (transaction.destination, transaction.source, transaction.type):
                 at_least_one = True
                 print('-' * 80)
-                print(json.dumps(movement.keywords, indent=4, cls=utils.AutoJSONEncoder))
-                print(json.dumps(movement.details, indent=4, cls=utils.AutoJSONEncoder))
+                print(json.dumps(transaction.keywords, indent=4, cls=utils.AutoJSONEncoder))
+                print(json.dumps(transaction.details, indent=4, cls=utils.AutoJSONEncoder))
 
         if at_least_one:
             print('-' * 80)
 
-        print(table(processed_movements))
+        print(table(processed_transactions))
 
