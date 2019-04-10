@@ -158,6 +158,8 @@ class ParsedAccountTransaction():
     keywords: list
     comment: str
     flags: ModifiedFlags
+    category: str= None
+    tags: list = field(default_factory=list)
 
 
 @dataclass
@@ -175,7 +177,8 @@ class ParsedCreditCardTransaction():
     keywords: list
     comment: str
     flags: ModifiedFlags
-
+    category: str = None
+    tags: list = field(default_factory=list)
 
 @dataclass
 class AccountTransaction():

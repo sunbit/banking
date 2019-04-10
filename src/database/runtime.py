@@ -26,7 +26,10 @@ def update_account_transactions(db, account_number, fetched_transactions):
         existing_transactions = list(map(
             io.decode_transaction,
             collection.find(
-                {'transaction_date': {'$gte': fetched_transactions[0].transaction_date}},
+                {
+                    'account.number': account_number,
+                    'transaction_date': {'$gte': fetched_transactions[0].transaction_date}
+                },
                 sort=[('_seq', 1)]
             )
         ))
@@ -41,4 +44,10 @@ def update_account_transactions(db, account_number, fetched_transactions):
             collection.update({'_id': transaction._id}, io.encode_transaction(transaction))
             updated += 1
 
+    inconsistent_transaction = io.check_balance_consistency(collection, account_number)
 
+    if inconsistent_transaction:
+        raise io.DatabaseError(
+            'Balance is inconsistent at {transaction.transaction_date} [balance={transaction.balance}, amount={transaction.amount}]'.format(
+                transaction=inconsistent_transaction)
+        )

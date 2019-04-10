@@ -9,7 +9,7 @@ import re
 import datatypes
 
 
-class DatabaseMatchError(Exception):
+class DatabaseError(Exception):
     pass
 
 
@@ -117,18 +117,18 @@ def find_transactions_since(collection, account_number, transaction):
     if transaction is None:
         return []
 
-    results = list(collection.find(
-        {
-            'account.number': account_number,
-            '_seq': {"$gte": transaction._seq}
-        },
-        sort=[('_seq', 1)]
+    results = list(map(
+        decode_transaction,
+        collection.find(
+            {
+                'account.number': account_number,
+                '_seq': {"$gte": transaction._seq}
+            },
+            sort=[('_seq', 1)]
+        )
     ))
 
-    if not results:
-        return []
-
-    return list(map(decode_transaction, results))
+    return results
 
 
 def transactions_match(transaction_1, transaction_2):
@@ -161,6 +161,29 @@ def log_action(transaction, action):
         action=action,
         amount=align_decimal(transaction.amount)
     ))
+
+
+def check_balance_consistency(collection, account_number):
+    results = list(map(
+        decode_transaction,
+        collection.find(
+            {
+                'account.number': account_number,
+            },
+            sort=[('_seq', 1)]
+        )
+    ))
+
+    last_balance = results[0].balance
+
+    for transaction in results[1:]:
+        # Fucking python floating point precission shit ...
+        is_consistent = round(last_balance + transaction.amount, 2) == transaction.balance
+        if not is_consistent:
+            return transaction
+        last_balance = transaction.balance
+
+    return None
 
 
 def select_new_transactions(fetched_transactions, db_transactions):
@@ -257,7 +280,7 @@ def select_new_transactions(fetched_transactions, db_transactions):
         elif action == '-' and not all_fetched_processed:
             # This will never happen, as the last conditional in the loop breaks it
             # the as soon as all fetched items are processed
-            raise DatabaseMatchError('transaction history has diverged')
+            raise DatabaseError('transaction history has diverged')
 
         # After processing the last fetched transaction, if we didn't do
         # anything that broke the sequence numbering, we can stop

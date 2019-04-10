@@ -177,7 +177,7 @@ if __name__ == '__main__':
                 processed_transactions = rules.apply(rules.load(), parsed_transactions)
                 try:
                     database.update_account_transactions(database.load(), account_config.number, processed_transactions)
-                except database.DatabaseMatchError as exc:
+                except database.DatabaseError as exc:
                     print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
                     sys.exit(1)
 
