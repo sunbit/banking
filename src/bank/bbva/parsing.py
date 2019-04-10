@@ -2,8 +2,8 @@ from itertools import chain
 
 import re
 
-from datatypes import TransactionType, TransactionDirection, ParsedTransaction, ModifiedFlags
-from datatypes import Bank, Account, Card, UnknownSubject, UnknownWallet
+from datatypes import TransactionType, TransactionDirection, ParsedAccountTransaction, ParsedCreditCardTransaction
+from datatypes import Account, Bank, Card, ModifiedFlags, UnknownSubject, UnknownWallet
 from common.parsing import extract_literals, extract_keywords, get_nested_item
 
 import datatypes
@@ -241,9 +241,8 @@ def get_card(account_config, card_number):
     if card_number is None:
         return None
 
-    for card in account_config.cards:
-        if card.number == card_number:
-            return Card.from_config(card)
+    if card_number in account_config.cards:
+        return Card.from_config(account_config.cards[card_number])
 
     # Possibly an old card no longer registered
     return Card('Unknown card', card_number)
@@ -284,7 +283,11 @@ def parse_account_transaction(bank_config, account_config, transaction):
 
     comment = get_comment(details, transaction_type)
 
-    return ParsedTransaction(
+    source = get_source(details, transaction_type)
+    destination = get_destination(details, transaction_type)
+    del details['bank']
+
+    return ParsedAccountTransaction(
         transaction_id=transaction['id'],
         type=transaction_type,
         currency=transaction['amount']['currency']['code'],
@@ -292,8 +295,9 @@ def parse_account_transaction(bank_config, account_config, transaction):
         balance=transaction['balance']['availableBalance']['amount'],
         value_date=decode_date(transaction['valueDate']),
         transaction_date=decode_date(transaction['transactionDate']),
-        source=get_source(details, transaction_type),
-        destination=get_destination(details, transaction_type),
+        source=source,
+        destination=destination,
+        account=details.pop('account'),
         card=used_card,
         details=details,
         keywords=keywords,
@@ -327,16 +331,20 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
 
     comment = get_comment(details, transaction_type)
 
-    return ParsedTransaction(
+    source = get_source(details, transaction_type)
+    destination = get_destination(details, transaction_type)
+    del details['bank']
+    del details['account']
+
+    return ParsedCreditCardTransaction(
         transaction_id=transaction['id'],
         type=transaction_type,
         currency=transaction['amount']['currency']['code'],
         amount=amount,
-        balance=None,
         value_date=decode_date(transaction['valueDate']),
         transaction_date=decode_date(transaction['transactionDate']),
-        source=get_source(details, transaction_type),
-        destination=get_destination(details, transaction_type),
+        source=source,
+        destination=destination,
         card=card_used,
         details=details,
         keywords=keywords,

@@ -30,6 +30,13 @@ class TransactionDirection(Enum):
 
 
 @dataclass
+class Configuration:
+    banks: dict
+    accounts: dict
+    cards: dict
+
+
+@dataclass
 class BankConfig:
     id: str
     name: str
@@ -40,7 +47,8 @@ class BankConfig:
 
 @dataclass
 class AccountConfig:
-    bank: str
+    type: str
+    bank_id: str
     name: str
     number: str
     cards: list
@@ -52,7 +60,7 @@ class CardConfig:
     name: str
     number: str
     owner: str
-    bank_id: str
+    active: bool
     account_number: str
 
 
@@ -134,12 +142,30 @@ class ModifiedFlags():
 
 
 @dataclass
-class ParsedTransaction():
+class ParsedAccountTransaction():
     transaction_id: str
     type: TransactionType
     currency: str
     amount: float
     balance: float
+    value_date: str
+    transaction_date: str
+    source: TransactionSubject
+    destination: TransactionSubject
+    account: Account
+    card: Card
+    details: dict
+    keywords: list
+    comment: str
+    flags: ModifiedFlags
+
+
+@dataclass
+class ParsedCreditCardTransaction():
+    transaction_id: str
+    type: TransactionType
+    currency: str
+    amount: float
     value_date: str
     transaction_date: str
     source: TransactionSubject
@@ -149,12 +175,10 @@ class ParsedTransaction():
     keywords: list
     comment: str
     flags: ModifiedFlags
-    category: str = None
-    tags: list = field(default_factory=list)
 
 
 @dataclass
-class Transaction():
+class AccountTransaction():
     transaction_id: str
     type: TransactionType
     currency: str
@@ -164,6 +188,7 @@ class Transaction():
     transaction_date: str
     source: TransactionSubject
     destination: TransactionSubject
+    account: Account
     card: Card
     details: dict
     keywords: list

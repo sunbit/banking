@@ -13,7 +13,7 @@ class DatabaseMatchError(Exception):
     pass
 
 
-def encode_movement(parsed_movement):
+def encode_transaction(parsed_transaction):
     def encode(obj):
         if is_dataclass(obj):
             encoded = obj.__dict__
@@ -43,10 +43,10 @@ def encode_movement(parsed_movement):
         else:
             return encoded
 
-    return recurse(parsed_movement)
+    return recurse(parsed_transaction)
 
 
-def decode_movement(document):
+def decode_transaction(document):
 
     if document is None:
         return None
@@ -93,12 +93,13 @@ def decode_movement(document):
     return decoded
 
 
-def find_movement(collection, movement):
+def find_transaction(collection, account_number, transaction):
     results = list(collection.find(
         {
-            'transaction_date': movement.transaction_date,
-            'amount': movement.amount,
-            'balance': movement.balance
+            'account.number': account_number,
+            'transaction_date': transaction.transaction_date,
+            'amount': transaction.amount,
+            'balance': transaction.balance
         },
         sort=[('_seq', 1)]
     ))
@@ -107,32 +108,35 @@ def find_movement(collection, movement):
         return None
 
     if len(results) > 1:
-        raise DatabaseMatchError('Found more than one match for a movement, check the algorithm')
+        raise DatabaseMatchError('Found more than one match for a transaction, check the algorithm')
 
-    return decode_movement(results[0])
+    return decode_transaction(results[0])
 
 
-def find_movements_since(collection, movement):
-    if movement is None:
+def find_transactions_since(collection, account_number, transaction):
+    if transaction is None:
         return []
 
     results = list(collection.find(
-        {'_seq': {"$gte": movement._seq}},
+        {
+            'account.number': account_number,
+            '_seq': {"$gte": transaction._seq}
+        },
         sort=[('_seq', 1)]
     ))
 
     if not results:
         return []
 
-    return list(map(decode_movement, results))
+    return list(map(decode_transaction, results))
 
 
-def movements_match(movement_1, movement_2):
-    if movement_1 is None or movement_2 is None:
+def transactions_match(transaction_1, transaction_2):
+    if transaction_1 is None or transaction_2 is None:
         return False
 
     def field_equals(field):
-        return getattr(movement_1, field) == getattr(movement_2, field)
+        return getattr(transaction_1, field) == getattr(transaction_2, field)
 
     return all(
         map(
@@ -151,43 +155,43 @@ def align_decimal(number):
     return aligned
 
 
-def log_action(movement, action):
+def log_action(transaction, action):
     print('> {action:2}  {m._seq:02}  {m.transaction_date}  {amount} '.format(
-        m=movement,
+        m=transaction,
         action=action,
-        amount=align_decimal(movement.amount)
+        amount=align_decimal(transaction.amount)
     ))
 
 
-def select_new_movements(fetched_movements, db_movements):
+def select_new_transactions(fetched_transactions, db_transactions):
 
-    def movement_string(movement):
-        return '{m.transaction_date} {m.amount} {m.balance}'.format(m=movement).encode('utf-8')
+    def transaction_string(transaction):
+        return '{m.transaction_date} {m.amount} {m.balance}'.format(m=transaction).encode('utf-8')
 
-    hashed_fetched_movements = [
+    hashed_fetched_transactions = [
         (
-            sha1(movement_string(movement)).hexdigest(),
-            movement,
+            sha1(transaction_string(transaction)).hexdigest(),
+            transaction,
         )
-        for movement in fetched_movements
+        for transaction in fetched_transactions
     ]
 
-    hashed_db_movements = [
+    hashed_db_transactions = [
         (
-            sha1(movement_string(movement)).hexdigest(),
-            movement,
+            sha1(transaction_string(transaction)).hexdigest(),
+            transaction,
         )
-        for movement in db_movements
+        for transaction in db_transactions
     ]
 
-    fetched_movements_by_hash = dict(hashed_fetched_movements)
-    db_movements_by_hash = dict(hashed_db_movements)
+    fetched_transactions_by_hash = dict(hashed_fetched_transactions)
+    db_transactions_by_hash = dict(hashed_db_transactions)
 
     # TODO Check for duplicate hashes
 
     diff = list(Differ().compare(
-        list(map(itemgetter(0), hashed_db_movements)),
-        list(map(itemgetter(0), hashed_fetched_movements))
+        list(map(itemgetter(0), hashed_db_transactions)),
+        list(map(itemgetter(0), hashed_fetched_transactions))
     ))
 
     next_seq_number = 0
@@ -202,61 +206,61 @@ def select_new_movements(fetched_movements, db_movements):
     for item in diff:
 
         action = item[0]
-        movement_hash = item[2:]
+        transaction_hash = item[2:]
 
-        if movement_hash == hashed_fetched_movements[-1][0]:
+        if transaction_hash == hashed_fetched_transactions[-1][0]:
             print('! Last fetched item')
             all_fetched_processed = True
 
         if action == '+':
-            # We have a movement in fetched that it's not on the database
-            movement = fetched_movements_by_hash[movement_hash]
-            new_movement = datatypes.Movement(_seq=next_seq_number, **movement.__dict__)
-            yield ('insert', new_movement)
+            # We have a transaction in fetched that it's not on the database
+            transaction = fetched_transactions_by_hash[transaction_hash]
+            new_transaction = datatypes.AccountTransaction(_seq=next_seq_number, **transaction.__dict__)
+            yield ('insert', new_transaction)
             next_seq_number += 1
             sequence_change_needed = True
-            log_action(new_movement, '+')
+            log_action(new_transaction, '+')
 
         elif action == ' ' and not sequence_change_needed:
-            # this movement is on both db and fetched movements
+            # this transaction is on both db and fetched transactions
             # so here we only set the next sequence number, that will be
-            # be used if we have new fetched movements at the tail
+            # be used if we have new fetched transactions at the tail
             # or we need to cascade change sequence numbers
-            next_seq_number = db_movements_by_hash[movement_hash]._seq + 1
-            log_action(db_movements_by_hash[movement_hash], 's')
+            next_seq_number = db_transactions_by_hash[transaction_hash]._seq + 1
+            log_action(db_transactions_by_hash[transaction_hash], 's')
 
         elif sequence_change_needed and action == ' ':
-            # this movement is on both db and fetched movements but we inserted
+            # this transaction is on both db and fetched transactions but we inserted
             # something that changed the sequence, so we need to update it
-            stored_movement = db_movements_by_hash[movement_hash]
-            updated_movement = datatypes.Movement(**stored_movement.__dict__)
-            updated_movement._seq = next_seq_number
-            yield ('update', updated_movement)
+            stored_transaction = db_transactions_by_hash[transaction_hash]
+            updated_transaction = datatypes.AccountTransaction(**stored_transaction.__dict__)
+            updated_transaction._seq = next_seq_number
+            yield ('update', updated_transaction)
             next_seq_number += 1
-            log_action(updated_movement, 'u')
+            log_action(updated_transaction, 'u')
 
         elif action == '-' and all_fetched_processed and sequence_change_needed:
-            # this movement is only on db but as something happened
+            # this transaction is only on db but as something happened
             # that changed the sequence, so we need to update it
-            stored_movement = db_movements_by_hash[movement_hash]
-            updated_movement = datatypes.Movement(**stored_movement.__dict__)
-            updated_movement._seq = next_seq_number
-            yield ('update', updated_movement)
+            stored_transaction = db_transactions_by_hash[transaction_hash]
+            updated_transaction = datatypes.AccountTransaction(**stored_transaction.__dict__)
+            updated_transaction._seq = next_seq_number
+            yield ('update', updated_transaction)
             next_seq_number += 1
-            log_action(updated_movement, 'u-')
+            log_action(updated_transaction, 'u-')
 
         elif action == '-' and all_fetched_processed and not sequence_change_needed:
             # This will never happen, as the last conditional in the loop breaks it
             # the as soon as all fetched items are processed
-            log_action(movement, '?')
+            log_action(transaction, '?')
             pass
 
         elif action == '-' and not all_fetched_processed:
             # This will never happen, as the last conditional in the loop breaks it
             # the as soon as all fetched items are processed
-            raise DatabaseMatchError('Movement history has diverged')
+            raise DatabaseMatchError('transaction history has diverged')
 
-        # After processing the last fetched movement, if we didn't do
+        # After processing the last fetched transaction, if we didn't do
         # anything that broke the sequence numbering, we can stop
         if all_fetched_processed and not sequence_change_needed:
             print('X Quitting, all fetched processed')
@@ -264,39 +268,39 @@ def select_new_movements(fetched_movements, db_movements):
 
     # import ipdb;ipdb.set_trace()
 
-    # next_seq_number = 0 if current_db_movement is None else current_db_movement._seq
+    # next_seq_number = 0 if current_db_transaction is None else current_db_transaction._seq
 
-    # while current_fetched_movement is not None:
+    # while current_fetched_transaction is not None:
     #     # If both iterators turn None at the same time, the loop will exit, so if we have a
     #     # negative match because a None, it can be only because the db iterator yielded none
     #     # otherwise we would have left the loop
 
-    #     if movements_match(current_fetched_movement, current_db_movement):
+    #     if transactions_match(current_fetched_transaction, current_db_transaction):
     #         # We have a match, so we don't need to add anything, an we can skip both
     #         # iterators to the next one
-    #         if current_db_movement._seq != next_seq_number:
-    #             current_db_movement._seq = next_seq_number
-    #             yield ('update', current_db_movement)
+    #         if current_db_transaction._seq != next_seq_number:
+    #             current_db_transaction._seq = next_seq_number
+    #             yield ('update', current_db_transaction)
 
-    #         current_fetched_movement = next(fetched, None)
-    #         current_db_movement = next(on_db, None)
+    #         current_fetched_transaction = next(fetched, None)
+    #         current_db_transaction = next(on_db, None)
     #         next_seq_number += 1
 
-    #     elif current_db_movement is None:
+    #     elif current_db_transaction is None:
     #         # We reached a point where all the iterated items until here exist on the database
     #         # so, starting now, all fetched items should be added to the database and pick the next one
-    #         yield ('insert', datatypes.Movement(_seq=next_seq_number, **current_fetched_movement.__dict__))
-    #         current_fetched_movement = next(fetched, None)
+    #         yield ('insert', datatypes.AccountTransaction(_seq=next_seq_number, **current_fetched_transaction.__dict__))
+    #         current_fetched_transaction = next(fetched, None)
     #         next_seq_number += 1
 
-    #     elif current_fetched_movement is None:
+    #     elif current_fetched_transaction is None:
     #         # This will never happen
     #         pass
     #     else:
     #         # For now we assume that when this happens it can only be because missing
-    #         # movements are added, in any position of the sequence, but sequence is not changed
-    #         yield ('insert', datatypes.Movement(_seq=next_seq_number, **current_fetched_movement.__dict__))
-    #         current_fetched_movement = next(fetched, None)
+    #         # transactions are added, in any position of the sequence, but sequence is not changed
+    #         yield ('insert', datatypes.AccountTransaction(_seq=next_seq_number, **current_fetched_transaction.__dict__))
+    #         current_fetched_transaction = next(fetched, None)
     #         next_seq_number += 1
 
-    #         #raise DatabaseMatchError('Movement history has diverged')
+    #         #raise DatabaseMatchError('transaction history has diverged')

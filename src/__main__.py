@@ -101,14 +101,16 @@ if __name__ == '__main__':
         source = 'card'
 
     banking_configuration = bank.load_config('banking.yaml')
-    bank_config = bank.load_bank(banking_configuration, bank_id)
+    bank_config = banking_configuration.banks[bank_id]
     bank_module = bank.load_module(bank_id)
 
-    # Assuming we have only one account and one credit card
-    account_config = bank_config.accounts[0]
+    # Assuming we have only one account
+    account_config = list(bank_config.accounts.values())[0]
+
+    # Assuming we pick the first credit card available
     credit_card_config = list(filter(
-        lambda card: card.type == 'credit',
-        account_config.cards
+        lambda card: card.type == 'credit' and card.active,
+        account_config.cards.values()
     ))[0]
 
     if action == 'get':
@@ -174,7 +176,7 @@ if __name__ == '__main__':
                 parsed_transactions = bank.parse_account_transactions(bank_module, bank_config, account_config, raw_transactions)
                 processed_transactions = rules.apply(rules.load(), parsed_transactions)
                 try:
-                    database.update_account_transactions(database.load(bank_config), processed_transactions)
+                    database.update_account_transactions(database.load(), account_config.number, processed_transactions)
                 except database.DatabaseMatchError as exc:
                     print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
                     sys.exit(1)

@@ -5,40 +5,40 @@ import re
 from . import io
 
 
-def load(bank_config):
+def load():
     connection = TinyMongoClient('database')
-    db = getattr(connection, bank_config.id)
+    db = getattr(connection, 'banking')
     return db
 
 
-def update_account_movements(db, fetched_movements):
-    if not fetched_movements:
+def update_account_transactions(db, account_number, fetched_transactions):
+    if not fetched_transactions:
         return
 
-    collection = db.account_movements
+    collection = db.account_transactions
 
-    # Get from the database all the movements starting with the
-    # first one that matches the first fetched movement
-    first_fetched_movement = io.find_movement(collection, fetched_movements[0])
-    if first_fetched_movement is not None:
-        existing_movements = io.find_movements_since(collection, first_fetched_movement)
+    # Get from the database all the transactions starting with the
+    # first one that matches the first fetched transaction
+    first_fetched_transaction = io.find_transaction(collection, account_number, fetched_transactions[0])
+    if first_fetched_transaction is not None:
+        existing_transactions = io.find_transactions_since(collection, account_number, first_fetched_transaction)
     else:
-        existing_movements = list(map(
-            io.decode_movement,
+        existing_transactions = list(map(
+            io.decode_transaction,
             collection.find(
-                {'transaction_date': {'$gte': fetched_movements[0].transaction_date}},
+                {'transaction_date': {'$gte': fetched_transactions[0].transaction_date}},
                 sort=[('_seq', 1)]
             )
         ))
 
     added = 0
     updated = 0
-    for action, movement in io.select_new_movements(fetched_movements, existing_movements):
+    for action, transaction in io.select_new_transactions(fetched_transactions, existing_transactions):
         if action == 'insert':
-            collection.insert_one(io.encode_movement(movement))
+            collection.insert_one(io.encode_transaction(transaction))
             added += 1
         elif action == 'update':
-            collection.update({'_id': movement._id}, io.encode_movement(movement))
+            collection.update({'_id': transaction._id}, io.encode_transaction(transaction))
             updated += 1
 
 

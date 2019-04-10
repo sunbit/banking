@@ -3,21 +3,43 @@ import yaml
 
 from functools import partial
 
-from .io import decode
+from .io import decode_bank, decode_card, decode_account
+from datatypes import Configuration
 
 
 def load_config(filename):
     with open(filename) as config_file:
-        configuration = yaml.load(config_file, Loader=yaml.FullLoader)
-    return configuration
+        raw_configuration = yaml.load(config_file, Loader=yaml.FullLoader)
 
+        cards = {card.number: card for card in map(decode_card, raw_configuration['cards'])}
 
-def load_bank(configuration, bank_id):
-    bank_config = list(filter(
-        lambda bank: bank['id'] == bank_id,
-        configuration
-    ))[0]
-    return decode(bank_config)
+        accounts = {
+            account['number']: decode_account(
+                account,
+                cards={
+                    card_number: card
+                    for card_number, card in cards.items()
+                    if card.account_number == account['number']
+                }
+            )
+            for account in raw_configuration['accounts']
+        }
+        banks = {
+            bank['id']: decode_bank(
+                bank,
+                accounts={
+                    account_number: account
+                    for account_number, account in accounts.items()
+                    if account.bank_id == bank['id']
+                }
+            )
+            for bank in raw_configuration['banks']
+        }
+        return Configuration(
+            banks=banks,
+            accounts=accounts,
+            cards=cards
+        )
 
 
 def load_module(bank_id):

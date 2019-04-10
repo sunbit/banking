@@ -2,7 +2,7 @@ from itertools import chain
 
 import re
 
-from datatypes import TransactionType, TransactionDirection, ParsedTransaction
+from datatypes import TransactionType, TransactionDirection, ParsedAccountTransaction, ParsedCreditCardTransaction
 from datatypes import Account, Bank, Card, ModifiedFlags, UnknownSubject, UnknownWallet
 from common.parsing import extract_literals, extract_keywords, get_nested_item
 
@@ -253,7 +253,7 @@ def get_card(account_config, card_number):
     if card_number is None:
         return None
 
-    for card in account_config.cards:
+    for card in account_config.cards.values():
         # card is masked with **** except of the 4 first and last digits so we'll match
         # against those asterisks converted to digits
         match_card_regex = re.sub(r'\*+', r'\\d+', card_number)
@@ -292,7 +292,11 @@ def parse_account_transaction(bank_config, account_config, transaction):
 
     comment = get_comment(details, transaction_type)
 
-    return ParsedTransaction(
+    source = get_source(details, transaction_type)
+    destination = get_destination(details, transaction_type)
+    del details['bank']
+
+    return ParsedAccountTransaction(
         transaction_id=None,
         currency=transaction['importe']['moneda']['nombreCorto'],
         amount=amount,
@@ -300,8 +304,9 @@ def parse_account_transaction(bank_config, account_config, transaction):
         value_date=transaction['fechaValor']['valor'],
         transaction_date=transaction['fechaMovimiento']['valor'],
         type=transaction_type,
-        source=get_source(details, transaction_type),
-        destination=get_destination(details, transaction_type),
+        source=source,
+        destination=destination,
+        account=details.pop('account'),
         card=card_used,
         details=details,
         keywords=keywords,
@@ -334,16 +339,20 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
 
     comment = get_comment(details, transaction_type)
 
-    return ParsedTransaction(
+    source = get_source(details, transaction_type)
+    destination = get_destination(details, transaction_type)
+    del details['bank']
+    del details['account']
+
+    return ParsedCreditCardTransaction(
         transaction_id=transaction['identificadorMovimiento'],
         currency=transaction['importeMovimiento']['nombreMoneda'],
         amount=amount,
-        balance=None,
         value_date=transaction['fechaMovimiento']['valor'],
         transaction_date=transaction['fechaMovimiento']['valor'],
         type=transaction_type,
-        source=get_source(details, transaction_type),
-        destination=get_destination(details, transaction_type),
+        source=source,
+        destination=destination,
         card=card_used,
         details=details,
         keywords=keywords,
