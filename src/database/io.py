@@ -209,7 +209,6 @@ def select_new_transactions(fetched_transactions, db_transactions):
         transaction_hash = item[2:]
 
         if transaction_hash == hashed_fetched_transactions[-1][0]:
-            print('! Last fetched item')
             all_fetched_processed = True
 
         if action == '+':
@@ -265,42 +264,3 @@ def select_new_transactions(fetched_transactions, db_transactions):
         if all_fetched_processed and not sequence_change_needed:
             print('X Quitting, all fetched processed')
             break
-
-    # import ipdb;ipdb.set_trace()
-
-    # next_seq_number = 0 if current_db_transaction is None else current_db_transaction._seq
-
-    # while current_fetched_transaction is not None:
-    #     # If both iterators turn None at the same time, the loop will exit, so if we have a
-    #     # negative match because a None, it can be only because the db iterator yielded none
-    #     # otherwise we would have left the loop
-
-    #     if transactions_match(current_fetched_transaction, current_db_transaction):
-    #         # We have a match, so we don't need to add anything, an we can skip both
-    #         # iterators to the next one
-    #         if current_db_transaction._seq != next_seq_number:
-    #             current_db_transaction._seq = next_seq_number
-    #             yield ('update', current_db_transaction)
-
-    #         current_fetched_transaction = next(fetched, None)
-    #         current_db_transaction = next(on_db, None)
-    #         next_seq_number += 1
-
-    #     elif current_db_transaction is None:
-    #         # We reached a point where all the iterated items until here exist on the database
-    #         # so, starting now, all fetched items should be added to the database and pick the next one
-    #         yield ('insert', datatypes.AccountTransaction(_seq=next_seq_number, **current_fetched_transaction.__dict__))
-    #         current_fetched_transaction = next(fetched, None)
-    #         next_seq_number += 1
-
-    #     elif current_fetched_transaction is None:
-    #         # This will never happen
-    #         pass
-    #     else:
-    #         # For now we assume that when this happens it can only be because missing
-    #         # transactions are added, in any position of the sequence, but sequence is not changed
-    #         yield ('insert', datatypes.AccountTransaction(_seq=next_seq_number, **current_fetched_transaction.__dict__))
-    #         current_fetched_transaction = next(fetched, None)
-    #         next_seq_number += 1
-
-    #         #raise DatabaseMatchError('transaction history has diverged')
