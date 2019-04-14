@@ -5,6 +5,7 @@ Usage:
   banking get <bank> (account|card) transactions [options]
   banking load <bank> (account|card) transactions [options]
   banking load <bank> (account|card) raw transactions <raw-filename> [options]
+  banking server run
   banking (-h | --help)
   banking --version
 
@@ -87,7 +88,6 @@ def table(records, show_balance=True):
 
 
 if __name__ == '__main__':
-
     arguments = docopt(__doc__, version='Banking 1.0')
     bank_id = arguments['<bank>']
     action = list(filter(lambda action: arguments[action] is True, ['get', 'load']))[0]
@@ -118,7 +118,7 @@ if __name__ == '__main__':
         cache_filename = '.cache/{bank}_{source}_{id}_{from_date}_{to_date}.json'.format(
             bank=bank_config.id,
             source=source,
-            id=account_config.number if source == 'account' else credit_card_config.number,
+            id=account_config.id if source == 'account' else credit_card_config.number,
             from_date=arguments['--from'].replace('/', '-'),
             to_date=arguments['--to'].replace('/', '-')
         )
@@ -134,7 +134,7 @@ if __name__ == '__main__':
                 if source == 'account':
                     raw_transactions = bank_module.get_account_transactions(
                         browser,
-                        account_config.number,
+                        account_config.id,
                         arguments['--from'],
                         arguments['--to']
                     )
@@ -163,7 +163,9 @@ if __name__ == '__main__':
                     browser.driver.close()
                 sys.exit(1)
 
-        files_to_write = [cache_filename]
+        files_to_write = []
+        if arguments['--use-cache']:
+            files_to_write.append(cache_filename)
         if arguments['--save']:
             files_to_write.append(arguments['--save'])
 
@@ -176,7 +178,7 @@ if __name__ == '__main__':
                 parsed_transactions = bank.parse_account_transactions(bank_module, bank_config, account_config, raw_transactions)
                 processed_transactions = rules.apply(rules.load(), parsed_transactions)
                 try:
-                    database.update_account_transactions(database.load(), account_config.number, processed_transactions)
+                    database.update_account_transactions(database.load(), account_config.id, processed_transactions)
                 except database.DatabaseError as exc:
                     print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
                     sys.exit(1)

@@ -50,8 +50,14 @@ class AccountConfig:
     type: str
     bank_id: str
     name: str
-    number: str
+    id: str
     cards: list
+
+@dataclass
+class LocalAccountConfig:
+    type: str
+    id: str
+    name: str
 
 
 @dataclass
@@ -93,15 +99,25 @@ class Bank(TransactionSubject):
 
 @dataclass
 class Account(TransactionSubject):
-    number: str
+    id: str
 
     @classmethod
     def from_config(cls, account_config):
         return cls(
             account_config.name,
-            account_config.number
+            account_config.id
         )
 
+@dataclass
+class LocalAccount(TransactionSubject):
+    id: str
+
+    @classmethod
+    def from_config(cls, account_config):
+        return cls(
+            account_config.name,
+            account_config.id
+        )
 
 @dataclass
 class Card(TransactionSubject):
@@ -142,7 +158,7 @@ class ModifiedFlags():
 
 
 @dataclass
-class ParsedAccountTransaction():
+class ParsedBankAccountTransaction():
     transaction_id: str
     type: TransactionType
     currency: str
@@ -181,7 +197,7 @@ class ParsedCreditCardTransaction():
     tags: list = field(default_factory=list)
 
 @dataclass
-class AccountTransaction():
+class BankAccountTransaction():
     transaction_id: str
     type: TransactionType
     currency: str
@@ -202,6 +218,23 @@ class AccountTransaction():
     _id: str = None
     _seq: int = None
 
+@dataclass
+class LocalAccountTransaction():
+    type: TransactionType
+    currency: str
+    amount: float
+    balance: float
+    value_date: str
+    transaction_date: str
+    source: TransactionSubject
+    destination: TransactionSubject
+    account: LocalAccount
+    keywords: list
+    comment: str
+    category: str = None
+    tags: list = field(default_factory=list)
+    _id: str = None
+    _seq: int = None
 
 DATACLASSES = list(filter(lambda obj: is_dataclass(obj), locals().values()))
 ENUMS = list(filter(lambda obj: isinstance(obj, EnumMeta), locals().values()))

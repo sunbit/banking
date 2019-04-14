@@ -140,6 +140,8 @@ def new(*args, **kwargs):
     chrome_options.add_argument("--window-size=1920x800")
     if headless:
         chrome_options.add_argument("--headless")
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument("--no-sandbox")
 
     _driver = webdriver.Chrome(*args, chrome_options=chrome_options, **kwargs)
 

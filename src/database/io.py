@@ -96,7 +96,7 @@ def decode_transaction(document):
 def find_transaction(collection, account_number, transaction):
     results = list(collection.find(
         {
-            'account.number': account_number,
+            'account.id': account_number,
             'transaction_date': transaction.transaction_date,
             'amount': transaction.amount,
             'balance': transaction.balance
@@ -121,7 +121,7 @@ def find_transactions_since(collection, account_number, transaction):
         decode_transaction,
         collection.find(
             {
-                'account.number': account_number,
+                'account.id': account_number,
                 '_seq': {"$gte": transaction._seq}
             },
             sort=[('_seq', 1)]
@@ -168,7 +168,7 @@ def check_balance_consistency(collection, account_number):
         decode_transaction,
         collection.find(
             {
-                'account.number': account_number,
+                'account.id': account_number,
             },
             sort=[('_seq', 1)]
         )
@@ -237,7 +237,7 @@ def select_new_transactions(fetched_transactions, db_transactions):
         if action == '+':
             # We have a transaction in fetched that it's not on the database
             transaction = fetched_transactions_by_hash[transaction_hash]
-            new_transaction = datatypes.AccountTransaction(_seq=next_seq_number, **transaction.__dict__)
+            new_transaction = datatypes.BankAccountTransaction(_seq=next_seq_number, **transaction.__dict__)
             yield ('insert', new_transaction)
             next_seq_number += 1
             sequence_change_needed = True
@@ -255,7 +255,7 @@ def select_new_transactions(fetched_transactions, db_transactions):
             # this transaction is on both db and fetched transactions but we inserted
             # something that changed the sequence, so we need to update it
             stored_transaction = db_transactions_by_hash[transaction_hash]
-            updated_transaction = datatypes.AccountTransaction(**stored_transaction.__dict__)
+            updated_transaction = datatypes.BankAccountTransaction(**stored_transaction.__dict__)
             updated_transaction._seq = next_seq_number
             yield ('update', updated_transaction)
             next_seq_number += 1
@@ -265,7 +265,7 @@ def select_new_transactions(fetched_transactions, db_transactions):
             # this transaction is only on db but as something happened
             # that changed the sequence, so we need to update it
             stored_transaction = db_transactions_by_hash[transaction_hash]
-            updated_transaction = datatypes.AccountTransaction(**stored_transaction.__dict__)
+            updated_transaction = datatypes.BankAccountTransaction(**stored_transaction.__dict__)
             updated_transaction._seq = next_seq_number
             yield ('update', updated_transaction)
             next_seq_number += 1

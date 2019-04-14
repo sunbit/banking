@@ -1,4 +1,4 @@
-from datatypes import BankConfig, AccountConfig, CardConfig
+from datatypes import BankConfig, LocalAccountConfig, AccountConfig, CardConfig
 
 
 def decode_bank(bank_config, accounts=[]):
@@ -16,8 +16,16 @@ def decode_account(account_config, cards=[]):
         account_config['type'],
         account_config['bank_id'],
         account_config['name'],
-        account_config['number'],
+        account_config['id'],
         cards
+    )
+
+
+def decode_local_account(account_config, **kwargs):
+    return LocalAccountConfig(
+        account_config['type'],
+        account_config['id'],
+        account_config['name'],
     )
 
 

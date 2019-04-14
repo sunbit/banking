@@ -55,7 +55,7 @@ def get_account_transactions(browser, account_number, from_date, to_date):
     browser.get('https://web.bbva.es/index.html')
 
     log('Loading account page')
-    browser.find_elements_by_css_selector('p[role=link').filter(lambda element: account_number in element.text)[0].click()
+    browser.find_elements_by_css_selector('p[role=link').filter(lambda element: account_number in element.text)[0].forced_click()
 
     log('Loading account advanced search')
     browser.find_element_by_css_selector('ul.menuPestanas span.consultas').click()

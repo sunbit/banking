@@ -3,8 +3,15 @@ import yaml
 
 from functools import partial
 
-from .io import decode_bank, decode_card, decode_account
+from .io import decode_bank, decode_card, decode_account, decode_local_account
 from datatypes import Configuration
+
+
+def get_account_decoder(raw_account_config):
+    if raw_account_config['type'] == 'bank_account':
+        return decode_account
+    elif raw_account_config['type'] == 'local_account':
+        return decode_local_account
 
 
 def load_config(filename):
@@ -14,12 +21,12 @@ def load_config(filename):
         cards = {card.number: card for card in map(decode_card, raw_configuration['cards'])}
 
         accounts = {
-            account['number']: decode_account(
+            account['id']: get_account_decoder(account)(
                 account,
                 cards={
                     card_number: card
                     for card_number, card in cards.items()
-                    if card.account_number == account['number']
+                    if card.account_number == account['id']
                 }
             )
             for account in raw_configuration['accounts']
@@ -30,7 +37,7 @@ def load_config(filename):
                 accounts={
                     account_number: account
                     for account_number, account in accounts.items()
-                    if account.bank_id == bank['id']
+                    if getattr(account, 'bank_id', None) == bank['id']
                 }
             )
             for bank in raw_configuration['banks']

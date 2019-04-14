@@ -2,7 +2,7 @@ from itertools import chain
 
 import re
 
-from datatypes import TransactionType, TransactionDirection, ParsedAccountTransaction, ParsedCreditCardTransaction
+from datatypes import TransactionType, TransactionDirection, ParsedBankAccountTransaction, ParsedCreditCardTransaction
 from datatypes import Account, Bank, Card, ModifiedFlags, UnknownSubject, UnknownWallet
 from common.parsing import extract_literals, extract_keywords, get_nested_item
 
@@ -287,7 +287,7 @@ def parse_account_transaction(bank_config, account_config, transaction):
     destination = get_destination(details, transaction_type)
     del details['bank']
 
-    return ParsedAccountTransaction(
+    return ParsedBankAccountTransaction(
         transaction_id=transaction['id'],
         type=transaction_type,
         currency=transaction['amount']['currency']['code'],

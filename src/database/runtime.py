@@ -27,7 +27,7 @@ def update_account_transactions(db, account_number, fetched_transactions):
             io.decode_transaction,
             collection.find(
                 {
-                    'account.number': account_number,
+                    'account.id': account_number,
                     'transaction_date': {'$gte': fetched_transactions[0].transaction_date}
                 },
                 sort=[('_seq', 1)]
