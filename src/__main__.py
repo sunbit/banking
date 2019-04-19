@@ -5,7 +5,7 @@ Usage:
   banking get <bank> (account|card) transactions [options]
   banking load <bank> (account|card) transactions [options]
   banking load <bank> (account|card) raw transactions <raw-filename> [options]
-  banking server run
+  banking run server
   banking (-h | --help)
   banking --version
 
@@ -25,6 +25,7 @@ Options:
 # ps aux | grep "python src" | grep -v grep | tr -s " " | cut -d" " -f2 | xargs kill -9
 #  ps aux | grep -i chrome | grep webdriver | tr -s " " | cut -d" " -f2 | xargs kill -9
 
+from datetime import datetime
 from docopt import docopt
 from tabulate import tabulate
 
@@ -35,6 +36,7 @@ import traceback
 
 from common import utils
 
+import app
 import bank
 import database
 import datatypes
@@ -47,7 +49,7 @@ def table(records, show_balance=True):
     headers = ['Date', 'Amount', 'Balance', 'Type', 'Category', 'Card', 'Source', 'Recipient', 'Tags', 'Comment']
 
     if show_balance is False:
-        headers.remove(headers.index('Balance'))
+        headers.remove('Balance')
 
     def format_destination(destination):
         if destination is None:
@@ -87,20 +89,42 @@ def table(records, show_balance=True):
     return tabulate(rows, headers=headers, tablefmt='presto')
 
 
+def parse_date(date_string):
+    """
+        Dates from cli are expected as yyyy-mm-dd
+    """
+    try:
+        year, month, day = map(int, date_string.split('-'))
+    except:
+        print('Wrong date, format should be yyyy-mm-dd')
+        sys.exit(1)
+
+    return datetime(year, month, day)
+
+
 if __name__ == '__main__':
     arguments = docopt(__doc__, version='Banking 1.0')
+    banking_configuration = bank.load_config('banking.yaml')
+
+    if arguments['server'] and arguments['run']:
+        app.run(banking_configuration)
+        sys.exit(1)
+
     bank_id = arguments['<bank>']
     action = list(filter(lambda action: arguments[action] is True, ['get', 'load']))[0]
     headless = not arguments['--debug-browser']
     close_browser = not arguments['--keep-browser-open']
     load_raw = arguments['raw']
 
+    if arguments['get']:
+        from_date = parse_date(arguments['--from'])
+        to_date = parse_date(arguments['--to'])
+
     if arguments['account'] is True:
         source = 'account'
     elif arguments['card'] is True:
         source = 'card'
 
-    banking_configuration = bank.load_config('banking.yaml')
     bank_config = banking_configuration.banks[bank_id]
     bank_module = bank.load_module(bank_id)
 
@@ -119,8 +143,8 @@ if __name__ == '__main__':
             bank=bank_config.id,
             source=source,
             id=account_config.id if source == 'account' else credit_card_config.number,
-            from_date=arguments['--from'].replace('/', '-'),
-            to_date=arguments['--to'].replace('/', '-')
+            from_date=arguments['--from'],
+            to_date=arguments['--to']
         )
 
         if arguments['--use-cache'] and os.path.exists(cache_filename):
@@ -135,16 +159,16 @@ if __name__ == '__main__':
                     raw_transactions = bank_module.get_account_transactions(
                         browser,
                         account_config.id,
-                        arguments['--from'],
-                        arguments['--to']
+                        from_date,
+                        to_date
                     )
 
                 elif source == 'card':
                     raw_transactions = bank_module.get_credit_card_transactions(
                         browser,
                         credit_card_config.number,
-                        arguments['--from'],
-                        arguments['--to']
+                        from_date,
+                        to_date
                     )
 
             except exceptions.InteractionError as exc:
@@ -206,5 +230,5 @@ if __name__ == '__main__':
         if at_least_one:
             print('-' * 80)
 
-        print(table(processed_transactions))
+        print(table(processed_transactions, show_balance=source == 'account'))
 

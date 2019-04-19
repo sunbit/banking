@@ -1,5 +1,7 @@
-from functools import reduce, partial
+from common.utils import get_nested_item
+from functools import partial
 from itertools import chain
+
 
 import re
 import unicodedata
@@ -33,26 +35,6 @@ def cleanup(text):
 
 def tokenize(text):
     return text.split(' ')
-
-
-def get_nested_item(dictionary, xpath, default=None):
-
-    def getitem(d, key):
-        match = re.match(r'\[(\d+)\]', key)
-        if match:
-            index = int(match.groups()[0])
-            return d[index]
-        else:
-            return d.get(key)
-    try:
-        return reduce(getitem, xpath.split('.'), dictionary)
-    except TypeError:
-        return default
-    except IndexError:
-        # in case we do a xxx.[0].fsdf and the aray is not there
-        return default
-    except AttributeError:
-        return default
 
 
 def extract_keywords(literals):

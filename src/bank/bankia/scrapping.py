@@ -4,12 +4,20 @@ import json
 import re
 import time
 
+from common.logging import get_logger
 from scrapper.scripts import xhr_intercept_response
 from scrapper.driver import forced_click
 
 
+logger = get_logger(name='scrapper')
+
+
 def log(text):
-    print('> ' + text)
+    logger.debug(text)
+
+
+def encode_date(dt):
+    return dt.strftime('%d/%m/%Y')
 
 
 def login(browser, username, password):
@@ -61,8 +69,8 @@ def get_account_transactions(browser, account_number, from_date, to_date):
     browser.find_element_by_css_selector('oip-drop-section-search div[role="button"] i').forced_click()
 
     log('Filling date query parameters')
-    browser.find_element_by_css_selector('input#campoDesdeBuscador', visible=True).clear().send_keys(from_date)
-    browser.find_element_by_css_selector('input#campoHastaBuscador').clear().send_keys(to_date)
+    browser.find_element_by_css_selector('input#campoDesdeBuscador', visible=True).clear().send_keys(encode_date(from_date))
+    browser.find_element_by_css_selector('input#campoHastaBuscador').clear().send_keys(encode_date(to_date))
 
     log('Setting up XHR request interceptor')
     script = xhr_intercept_response(
@@ -136,8 +144,8 @@ def get_credit_card_transactions(browser, card_number, from_date, to_date):
     log('Filling date query parameters')
     time.sleep(2)
     browser.find_element_by_css_selector('form#formFiltroMovimientosTarjetas input#optionsRadios2').select()  # Select find between dates option
-    browser.find_element_by_css_selector('input#desde').clear().send_keys(from_date)
-    browser.find_element_by_css_selector('input#hasta').clear().send_keys(to_date)
+    browser.find_element_by_css_selector('input#desde').clear().send_keys(encode_date(from_date))
+    browser.find_element_by_css_selector('input#hasta').clear().send_keys(encode_date(to_date))
 
     # Execute search
 

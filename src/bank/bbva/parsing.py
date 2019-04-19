@@ -1,10 +1,13 @@
 from itertools import chain
 
+from datetime import datetime
 import re
 
 from datatypes import TransactionType, TransactionDirection, ParsedBankAccountTransaction, ParsedCreditCardTransaction
 from datatypes import Account, Bank, Card, ModifiedFlags, UnknownSubject, UnknownWallet
-from common.parsing import extract_literals, extract_keywords, get_nested_item
+from common.parsing import extract_literals, extract_keywords
+from common.utils import get_nested_item
+
 
 import datatypes
 
@@ -234,7 +237,8 @@ def get_card_transaction_details(transaction, transaction_type):
 
 
 def decode_date(date):
-    return date.split('T')[0]
+    year, month, day, hour, minute, second = re.search(r'^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)', date).groups()
+    return datetime(*map(int, [year, month, day, hour, minute, second]))
 
 
 def get_card(account_config, card_number):

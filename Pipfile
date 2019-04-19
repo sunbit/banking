@@ -13,6 +13,13 @@ docopt = "*"
 pyyaml = "*"
 tinymongo = {git = "https://github.com/sunbit/tinymongo.git"}
 tinydb-serialization = "*"
+flask = "*"
+flask-restful = "*"
+schedule = "*"
+dateutil = "*"
+python-dateutil = "*"
+python-telegram-bot = "*"
+pytest = "*"
 
 [requires]
-python_version = "3.7.2"
+python_version = "3.7.3"

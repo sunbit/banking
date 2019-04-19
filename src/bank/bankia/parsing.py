@@ -1,3 +1,4 @@
+from datetime import datetime
 from itertools import chain
 
 import re
@@ -269,6 +270,12 @@ def get_comment(details, transaction_type):
         return details['concept']
 
 
+def decode_date(date, hour=None):
+    year, month, day = date.split('T')[0].split('-')
+    hour, minute, second = (0, 0, 0) if hour is None else hour.split(':')
+    return datetime(*map(int, [year, month, day, hour, minute, second]))
+
+
 def parse_account_transaction(bank_config, account_config, transaction):
     amount = decode_numeric_value(transaction['importe'])
     transaction_code = transaction['codigoMovimiento']
@@ -301,8 +308,8 @@ def parse_account_transaction(bank_config, account_config, transaction):
         currency=transaction['importe']['moneda']['nombreCorto'],
         amount=amount,
         balance=decode_numeric_value(transaction['saldoPosterior']),
-        value_date=transaction['fechaValor']['valor'],
-        transaction_date=transaction['fechaMovimiento']['valor'],
+        value_date=decode_date(transaction['fechaValor']['valor'], ),
+        transaction_date=decode_date(transaction['fechaMovimiento']['valor']),
         type=transaction_type,
         source=source,
         destination=destination,
@@ -348,8 +355,8 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
         transaction_id=transaction['identificadorMovimiento'],
         currency=transaction['importeMovimiento']['nombreMoneda'],
         amount=amount,
-        value_date=transaction['fechaMovimiento']['valor'],
-        transaction_date=transaction['fechaMovimiento']['valor'],
+        value_date=decode_date(transaction['fechaMovimiento']['valor'], transaction['horaMovimiento']['valor']),
+        transaction_date=decode_date(transaction['fechaMovimiento']['valor'], transaction['horaMovimiento']['valor']),
         type=transaction_type,
         source=source,
         destination=destination,

@@ -11,6 +11,12 @@ def load():
     return db
 
 
+def last_transaction_date(db, account_number):
+    collection = db.account_transactions
+    results = io.find_account_transactions(collection, account_number)
+    return results[-1].transaction_date if results else None
+
+
 def update_account_transactions(db, account_number, fetched_transactions):
     if not fetched_transactions:
         return
@@ -19,20 +25,11 @@ def update_account_transactions(db, account_number, fetched_transactions):
 
     # Get from the database all the transactions starting with the
     # first one that matches the first fetched transaction
-    first_fetched_transaction = io.find_transaction(collection, account_number, fetched_transactions[0])
+    first_fetched_transaction = io.find_matching_account_transaction(collection, account_number, fetched_transactions[0])
     if first_fetched_transaction is not None:
-        existing_transactions = io.find_transactions_since(collection, account_number, first_fetched_transaction)
+        existing_transactions = io.find_account_transactions(collection, account_number, since_seq_number=first_fetched_transaction._seq)
     else:
-        existing_transactions = list(map(
-            io.decode_transaction,
-            collection.find(
-                {
-                    'account.id': account_number,
-                    'transaction_date': {'$gte': fetched_transactions[0].transaction_date}
-                },
-                sort=[('_seq', 1)]
-            )
-        ))
+        existing_transactions = io.find_account_transactions(collection, account_number, since_date=fetched_transactions[0].transaction_date)
 
     added = 0
     updated = 0
@@ -51,3 +48,5 @@ def update_account_transactions(db, account_number, fetched_transactions):
             'Balance is inconsistent at {transaction.transaction_date} [balance={transaction.balance}, amount={transaction.amount}]'.format(
                 transaction=inconsistent_transaction)
         )
+
+    return (added, updated)

@@ -1,4 +1,5 @@
 from scrapper.scripts import xhr_intercept_response
+from common.logging import get_logger
 from itertools import chain
 
 import json
@@ -27,8 +28,15 @@ catch (e) {{
 """
 
 
+logger = get_logger(name='scrapper')
+
+
 def log(text):
-    print('> ' + text)
+    logger.debug(text)
+
+
+def encode_date(dt):
+    return dt.strftime('%d/%m/%Y')
 
 
 def login(browser, username, password):
@@ -62,8 +70,8 @@ def get_account_transactions(browser, account_number, from_date, to_date):
     browser.find_element_by_css_selector('.busquedaAvanzada[role=button]', visible=True).click()
 
     log('Filling date query parameters')
-    browser.find_element_by_id('fechaDesdeQuery').focus().clear().send_keys(from_date)
-    browser.find_element_by_id('fechaHastaQuery').focus().clear().send_keys(to_date)
+    browser.find_element_by_id('fechaDesdeQuery').focus().clear().send_keys(encode_date(from_date))
+    browser.find_element_by_id('fechaHastaQuery').focus().clear().send_keys(encode_date(to_date))
 
     time.sleep(2)  # To try to avoid the null values in the date filter request
     log('Setting up XHR request interceptor')
@@ -71,8 +79,8 @@ def get_account_transactions(browser, account_number, from_date, to_date):
         match_url="accountTransactionsAdvancedSearch",
         output="interceptedResponse",
         request_intercept_script=FIX_NULL_DATE.format(
-            from_date='-'.join(reversed(from_date.split('/'))),
-            to_date='-'.join(reversed(to_date.split('/')))
+            from_date='-'.join(reversed(encode_date(from_date).split('/'))),
+            to_date='-'.join(reversed(encode_date(to_date).split('/')))
         )
     )
     browser.driver.execute_script(script)
@@ -123,8 +131,8 @@ def get_credit_card_transactions(browser, card_number, from_date, to_date):
     browser.find_element_by_css_selector('p.busquedaAvanzada[role="button"]', visible=True).click()
 
     log('Filling date query parameters')
-    browser.find_element_by_css_selector('input#fechaDesde').focus().clear().send_keys(from_date)
-    browser.find_element_by_css_selector('input#fechaHasta').focus().clear().send_keys(to_date)
+    browser.find_element_by_css_selector('input#fechaDesde').focus().clear().send_keys(encode_date(from_date))
+    browser.find_element_by_css_selector('input#fechaHasta').focus().clear().send_keys(encode_date(to_date))
 
     time.sleep(2)
     log('Setting up XHR request interceptor')

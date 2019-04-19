@@ -1,8 +1,11 @@
+
+from datetime import datetime
 from dataclasses import is_dataclass
 from difflib import Differ
 from enum import Enum
 from hashlib import sha1
 from operator import itemgetter
+from copy import deepcopy
 
 import re
 
@@ -11,6 +14,10 @@ import datatypes
 
 class DatabaseError(Exception):
     pass
+
+
+def encode_date(dt):
+    return dt.strftime('%d/%m/%YT%H:%M:%S')
 
 
 def encode_transaction(parsed_transaction):
@@ -23,6 +30,11 @@ def encode_transaction(parsed_transaction):
             return {
                 '__type__': 'enum::{}'.format(obj.__class__.__name__),
                 'name': obj.name
+            }
+        elif isinstance(obj, datetime):
+            return {
+                '__type__': 'datetime',
+                'date': encode_date(obj)
             }
         else:
             return obj
@@ -58,7 +70,7 @@ def decode_transaction(document):
         if '__type__' not in obj:
             return obj
 
-        custom_type_class, custom_type_name = obj.pop('__type__').split('::')
+        custom_type_class, custom_type_name = re.match(r'([^:]+)(?:::(.*))?', obj.pop('__type__')).groups()
 
         if custom_type_class == 'dataclass':
             CustomDataclass = getattr(datatypes, custom_type_name)
@@ -66,6 +78,8 @@ def decode_transaction(document):
         elif custom_type_class == 'enum':
             CustomEnum = getattr(datatypes, custom_type_name)
             return CustomEnum[obj['name']]
+        elif custom_type_class == 'datetime':
+            return datetime.strptime(obj['date'], '%d/%m/%YT%H:%M:%S')
         else:
             return obj
 
@@ -86,18 +100,19 @@ def decode_transaction(document):
             for item in decoded:
                 new.append(recurse(item))
             return new
+
         else:
             return decoded
 
-    decoded = recurse(document)
+    decoded = recurse(deepcopy(document))
     return decoded
 
 
-def find_transaction(collection, account_number, transaction):
+def find_matching_account_transaction(collection, account_number, transaction):
     results = list(collection.find(
         {
             'account.id': account_number,
-            'transaction_date': transaction.transaction_date,
+            'transaction_date.date': encode_date(transaction.transaction_date),
             'amount': transaction.amount,
             'balance': transaction.balance
         },
@@ -108,22 +123,26 @@ def find_transaction(collection, account_number, transaction):
         return None
 
     if len(results) > 1:
-        raise DatabaseMatchError('Found more than one match for a transaction, check the algorithm')
+        raise DatabaseError('Found more than one match for a transaction, check the algorithm')
 
     return decode_transaction(results[0])
 
 
-def find_transactions_since(collection, account_number, transaction):
-    if transaction is None:
-        return []
+def find_account_transactions(collection, account_number, since_seq_number=None, since_date=None):
+    query = {
+        'account.id': account_number,
+    }
+
+    if since_seq_number is not None:
+        query['_seq'] = {"$gte": since_seq_number}
+
+    if since_date is not None:
+        query['transaction_date.date'] = {'$gte': encode_date(since_date)}
 
     results = list(map(
         decode_transaction,
         collection.find(
-            {
-                'account.id': account_number,
-                '_seq': {"$gte": transaction._seq}
-            },
+            query,
             sort=[('_seq', 1)]
         )
     ))
@@ -164,15 +183,7 @@ def log_action(transaction, action):
 
 
 def check_balance_consistency(collection, account_number):
-    results = list(map(
-        decode_transaction,
-        collection.find(
-            {
-                'account.id': account_number,
-            },
-            sort=[('_seq', 1)]
-        )
-    ))
+    results = find_account_transactions(collection, account_number)
 
     last_balance = results[0].balance
 
@@ -222,9 +233,9 @@ def select_new_transactions(fetched_transactions, db_transactions):
     sequence_change_needed = False
     all_fetched_processed = False
 
-    from pprint import pprint
-    pprint(diff)
-    print()
+    # from pprint import pprint
+    # pprint(diff)
+    # print()
 
     for item in diff:
 
@@ -241,7 +252,7 @@ def select_new_transactions(fetched_transactions, db_transactions):
             yield ('insert', new_transaction)
             next_seq_number += 1
             sequence_change_needed = True
-            log_action(new_transaction, '+')
+            # log_action(new_transaction, '+')
 
         elif action == ' ' and not sequence_change_needed:
             # this transaction is on both db and fetched transactions
@@ -249,7 +260,7 @@ def select_new_transactions(fetched_transactions, db_transactions):
             # be used if we have new fetched transactions at the tail
             # or we need to cascade change sequence numbers
             next_seq_number = db_transactions_by_hash[transaction_hash]._seq + 1
-            log_action(db_transactions_by_hash[transaction_hash], 's')
+            # log_action(db_transactions_by_hash[transaction_hash], 's')
 
         elif sequence_change_needed and action == ' ':
             # this transaction is on both db and fetched transactions but we inserted
@@ -259,7 +270,7 @@ def select_new_transactions(fetched_transactions, db_transactions):
             updated_transaction._seq = next_seq_number
             yield ('update', updated_transaction)
             next_seq_number += 1
-            log_action(updated_transaction, 'u')
+            # log_action(updated_transaction, 'u')
 
         elif action == '-' and all_fetched_processed and sequence_change_needed:
             # this transaction is only on db but as something happened
@@ -269,21 +280,21 @@ def select_new_transactions(fetched_transactions, db_transactions):
             updated_transaction._seq = next_seq_number
             yield ('update', updated_transaction)
             next_seq_number += 1
-            log_action(updated_transaction, 'u-')
+            # log_action(updated_transaction, 'u-')
 
         elif action == '-' and all_fetched_processed and not sequence_change_needed:
             # This will never happen, as the last conditional in the loop breaks it
             # the as soon as all fetched items are processed
-            log_action(transaction, '?')
+            # log_action(transaction, '?')
             pass
 
         elif action == '-' and not all_fetched_processed:
             # This will never happen, as the last conditional in the loop breaks it
             # the as soon as all fetched items are processed
-            raise DatabaseError('transaction history has diverged')
+            raise DatabaseError('Transaction history has diverged')
 
         # After processing the last fetched transaction, if we didn't do
         # anything that broke the sequence numbering, we can stop
         if all_fetched_processed and not sequence_change_needed:
-            print('X Quitting, all fetched processed')
+            # print('X Quitting, all fetched processed')
             break

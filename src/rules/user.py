@@ -1,289 +1,321 @@
-from . import domain
-import datatypes
+from .domain import Rule
+from .io import Match, MatchAll, MatchAny
+from .io import Set, SetFromCapture, Add
+from datatypes import TransactionType
 
 _rules = [
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.RECEIVED_TRANSFER),
-            domain.MatchKeywords(['GIL', 'AEAT', 'DEDUCCION'], domain.AND)
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            MatchAll('keywords', 'GIL', 'AEAT', 'DEDUCCION')
         ],
         actions=[
-            domain.setIssuer('Agencia Tributaria', ),
-            domain.setComment('Deducció Maternitat Gil')
+            Set('source', 'Agencia Tributaria'),
+            Set('comment', 'Deducció Maternitat Gil')
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.RECEIVED_TRANSFER),
-            domain.MatchKeywords(['AEAT', 'IRPF', 'CARLES'], domain.AND)
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            MatchAll('keywords', 'GIL', 'AEAT', 'DEDUCCION')
         ],
         actions=[
-            domain.setIssuer('Agencia Tributaria', ),
-            domain.setComment('Devolució Declaració Renda Carles')
+            Set('source', 'Agencia Tributaria'),
+            Set('comment', 'Deducció Maternitat Gil')
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.RECEIVED_TRANSFER),
-            domain.MatchKeywords(['AEAT', 'IRPF', 'NURIA'], domain.AND)
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            MatchAll('keywords', 'AEAT', 'IRPF', 'CARLES')
         ],
         actions=[
-            domain.setIssuer('Agencia Tributaria', ),
-            domain.setComment('Devolució Declaració Renda Núria')
+            Set('source', 'Agencia Tributaria'),
+            Set('comment', 'Devolució Declaració Renda Carles')
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.RECEIVED_TRANSFER),
-            domain.MatchKeywords(['ESCORIAL'], domain.AND)
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            MatchAll('keywords', 'AEAT', 'IRPF', 'NURIA')
         ],
         actions=[
-            domain.setIssuer('Fundació Escola Vedruna'),
-            domain.setComment('Nòmina Núria')
+            Set('source', 'Agencia Tributaria'),
+            Set('comment', 'Devolució Declaració Renda Núria')
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['FUNDACIO', 'EDUCACIO', 'ART'], domain.AND)
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            MatchAll('keywords', 'ESCORIAL')
         ],
         actions=[
-            domain.setRecipient("Escola Bressol Vic"),
-            domain.setComment('Mensualitat Gil')
+            Set('source', 'Fundació Escola Vedruna'),
+            Set('comment', 'Nòmina Núria')
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['BBVA', 'SEGUROS'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'FUNDACIO', 'EDUCACIO', 'ART')
         ],
         actions=[
-            domain.setRecipient("BBVA Seguros"),
-            domain.setComment("Aportació Pla d'estalvi")
+            Set('destination', "Escola Bressol Vic"),
+            Set('comment', 'Mensualitat Gil')
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['CRUZ', 'ROJA'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'BBVA', 'SEGUROS')
         ],
         actions=[
-            domain.setRecipient("Creu roja"),
-            domain.setComment("Semestre de soci")
+            Set('destination', "BBVA Seguros"),
+            Set('comment', "Aportació Pla d'estalvi")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['MUSSAP'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'CRUZ', 'ROJA')
         ],
         actions=[
-            domain.setRecipient("Mussap"),
-            domain.setComment("Assegurança cotxe")
+            Set('destination', "Creu roja"),
+            Set('comment', "Semestre de soci")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['AXA', 'SEGUROS'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'MUSSAP')
         ],
         actions=[
-            domain.setRecipient("AXA/Winterthur"),
-            domain.setComment("Mutua Núria")
+            Set('destination', "Mussap"),
+            Set('comment', "Assegurança cotxe")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['TARADELL', 'RECIBO'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'AXA', 'SEGUROS')
         ],
         actions=[
-            domain.setRecipient("Ajuntament de Taradell"),
-            domain.setComment("Impost Vehicles: Yaris")
+            Set('destination', "AXA/Winterthur"),
+            Set('comment', "Mutua Núria")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['TARADELL', 'RESIDUS'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'TARADELL', 'RECIBO')
         ],
         actions=[
-            domain.setRecipient("Ajuntament de Taradell"),
-            domain.setComment("Impost Residus")
+            Set('destination', "Ajuntament de Taradell"),
+            Set('comment', "Impost Vehicles: Yaris")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['TARADELL', 'IMMOBLES'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'TARADELL', 'RESIDUS')
         ],
         actions=[
-            domain.setRecipient("Ajuntament de Taradell"),
-            domain.setComment("Impost Bens Immobles")
+            Set('destination', "Ajuntament de Taradell"),
+            Set('comment', "Impost Residus")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['TARADELL', 'ADEUDO'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'TARADELL', 'IMMOBLES')
         ],
         actions=[
-            domain.setRecipient("Ajuntament de Taradell"),
-            domain.setComment("Impost circulació")
+            Set('destination', "Ajuntament de Taradell"),
+            Set('comment', "Impost Bens Immobles")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['TARADELL', 'VEHICLES'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'TARADELL', 'ADEUDO')
         ],
         actions=[
-            domain.setRecipient("Ajuntament de Taradell"),
-            domain.setComment("Impost Vehicles")
+            Set('destination', "Ajuntament de Taradell"),
+            Set('comment', "Impost circulació")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['TARADELL', 'ENTRADA'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'TARADELL', 'VEHICLES')
         ],
         actions=[
-            domain.setRecipient("Ajuntament de Taradell"),
-            domain.setComment("Impost Gual")
+            Set('destination', "Ajuntament de Taradell"),
+            Set('comment', "Impost Vehicles")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchKeywords(['VEDRUNA', 'ESCORIAL', 'RECIBO'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'TARADELL', 'ENTRADA')
         ],
         actions=[
-            domain.setRecipient("Fundació Escola Vedruna"),
-            domain.setComment("Rebut dinars o altres")
+            Set('destination', "Ajuntament de Taradell"),
+            Set('comment', "Impost Gual")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.RECEIVED_TRANSFER),
-            domain.MatchDetail('origin_account_number', '21000420510200148152')
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            MatchAll('keywords', 'VEDRUNA', 'ESCORIAL', 'RECIBO')
         ],
         actions=[
-            domain.setIssuer("Fundació Escola Vedruna"),
-            domain.setComment("Pagament activitats extres: {details[concept]}")
+            Set('destination', "Fundació Escola Vedruna"),
+            Set('comment', "Rebut dinars o altres")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.RECEIVED_TRANSFER),
-            domain.MatchKeywords(['TGSS', 'NOMINA', 'PENSION'], domain.AND)
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            Match('details.origin_account_number', '21000420510200148152')
         ],
         actions=[
-            domain.setIssuer("Tresoreria Seguretat Social"),
-            domain.setComment("Nòmina permís maternitat Núria")
+            Set('source', 'Fundació Escola Vedruna'),
+            Set('comment', "Pagament activitats extres: {details[concept]}")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchDetail('drawee', 'Nuria'),
-            domain.MatchKeywords(['SIMYO'], domain.AND)
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            MatchAll('keywords', 'TGSS', 'NOMINA', 'PENSION')
         ],
         actions=[
-            domain.setComment("Mòbil Núria")
+            Set('source', 'Tresoreria Seguretat Social'),
+            Set('comment', "Nòmina permís maternitat Núria")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.DOMICILED_RECEIPT),
-            domain.MatchDetail('drawee', 'Carles'),
-            domain.MatchKeywords(['SIMYO'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            Match('details.drawee', 'Nuria'),
+            MatchAll('keywords', 'SIMYO')
         ],
         actions=[
-            domain.setComment("Mòbil Carles")
+            Set('comment', "Mòbil Núria")
         ]
     ),
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.RECEIVED_TRANSFER),
-            domain.MatchKeywords(['NEXIONA'], domain.AND)
+            Match('type', TransactionType.DOMICILED_RECEIPT),
+            Match('details.drawee', 'Carles'),
+            MatchAll('keywords', 'SIMYO')
         ],
         actions=[
-            domain.setIssuer("Nexiona Connectocrats S.L."),
+            Set('comment', "Mòbil Carles")
         ]
     ),
-
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.PURCHASE),
-            domain.MatchField('destination', 'Paypal')
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            MatchAll('keywords', 'NEXIONA')
         ],
         actions=[
-            domain.setRecipient(r'Paypal\s+\*(.*)', 0),
-            domain.setTag('paypal')
-        ]
-    ),
-
-    domain.Rule(
-        conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.PURCHASE),
-            domain.MatchFieldMulti('destination', ['Amz\*', 'Amzn', 'Amazon', ], domain.OR)
-        ],
-        actions=[
-            domain.setRecipient("Amazon"),
+            Set('source', 'Nexiona Connectocrats S.L.'),
         ]
     ),
 
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.PURCHASE_RETURN),
-            domain.MatchFieldMulti('source', ['Amz\*', 'Amzn', 'Amazon', ], domain.OR)
+            Match('type', TransactionType.PURCHASE),
+            Match('destination', 'Paypal', regex='search')
         ],
         actions=[
-            domain.setIssuer("Amazon"),
+            SetFromCapture('destination', source='destination', regex=r'Paypal\s+\*(.*)'),
+            Add('tags', 'paypal')
         ]
     ),
 
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.PURCHASE),
-            domain.MatchFieldMulti('destination', ['Aliexpress'], domain.OR)
+            MatchAny('type', TransactionType.PURCHASE, TransactionType.PURCHASE_RETURN),
+            MatchAny('destination', r'Amz\*', r'Amzn', r'Amazon', regex='search')
         ],
         actions=[
-            domain.setRecipient("Aliexpress"),
+            Set('destination', "Amazon"),
         ]
     ),
 
-    domain.Rule(
+
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.PURCHASE_RETURN),
-            domain.MatchFieldMulti('source', ['Aliexpress'], domain.OR)
+            Match('type', TransactionType.PURCHASE),
+            Match('destination', 'Aliexpress', regex='search')
         ],
         actions=[
-            domain.setIssuer("Aliexpress"),
+            Set('destination', "Aliexpress"),
         ]
     ),
 
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.ISSUED_TRANSFER),
-            domain.MatchKeywords(['PAGO', 'ENTRE', 'AMIGOS'], domain.AND)
+            Match('type', TransactionType.PURCHASE_RETURN),
+            Match('source', 'Aliexpress', regex='search')
         ],
         actions=[
-            domain.setTag("Bizum"),
-            domain.setComment("{details[concept]}", regex=r'\/([^\/]+)$', regex_group=0)
+            Set('source', 'Aliexpress'),
+        ]
+    ),
+
+    Rule(
+        conditions=[
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            Match('source', r'A\.E\.A\.T\.', regex='search')
+        ],
+        actions=[
+            Set('source', 'Agencia Tributaria')
+        ]
+    ),
+
+    Rule(
+        conditions=[
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            Match('keywords', r'TGSS')
+        ],
+        actions=[
+            Set('source', 'Institut Nacional Seguretat Social')
+        ]
+    ),
+
+    Rule(
+        conditions=[
+            Match('type', TransactionType.RECEIVED_TRANSFER),
+            Match('source', r'paypal', regex='search')
+        ],
+        actions=[
+            Set('source', 'Paypal')
+        ]
+    ),
+
+    Rule(
+        conditions=[
+            Match('type', TransactionType.ISSUED_TRANSFER),
+            MatchAll('keywords', 'PAGO', 'ENTRE', 'AMIGOS')
+        ],
+        actions=[
+            Add('tags', "Bizum"),
+            SetFromCapture('comment', source='details.concept', regex=r'\/([^\/]+)$')
         ]
     ),
 
     # Categorization Rules
 
-    domain.Rule(
+    Rule(
         conditions=[
-            domain.MatchTransactionType(datatypes.TransactionType.PURCHASE),
-            domain.MatchFieldMulti('destination', ['E\.S\.\s+', 'esclatoil'], domain.OR)
+            Match('type', TransactionType.PURCHASE),
+            MatchAny('destination', r'E\.S\.\s+', r'esclatoil', regex='search')
         ],
         actions=[
-            domain.setCategory("Gasoil")
+            Set('category', 'Gasoil')
         ]
     ),
 ]
-
