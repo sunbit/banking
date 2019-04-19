@@ -20,6 +20,7 @@ dateutil = "*"
 python-dateutil = "*"
 python-telegram-bot = "*"
 pytest = "*"
+urllib3 = ">=1.24.2"
 
 [requires]
 python_version = "3.7.3"
