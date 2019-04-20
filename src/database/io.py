@@ -17,7 +17,7 @@ class DatabaseError(Exception):
 
 
 def encode_date(dt):
-    return dt.strftime('%d/%m/%YT%H:%M:%S')
+    return dt.strftime('%Y/%m/%dT%H:%M:%S')
 
 
 def encode_transaction(parsed_transaction):
@@ -79,7 +79,7 @@ def decode_transaction(document):
             CustomEnum = getattr(datatypes, custom_type_name)
             return CustomEnum[obj['name']]
         elif custom_type_class == 'datetime':
-            return datetime.strptime(obj['date'], '%d/%m/%YT%H:%M:%S')
+            return datetime.strptime(obj['date'], '%Y/%m/%dT%H:%M:%S')
         else:
             return obj
 
