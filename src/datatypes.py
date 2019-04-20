@@ -147,6 +147,18 @@ class Wallet(TransactionSubject):
 
 
 @dataclass
+class Category():
+    id: str
+    name: str
+    parent: str = None
+
+@dataclass
+class RelatedTransaction():
+    account_type: str
+    account_id: str
+    transaction_id: str
+
+@dataclass
 class ModifiedFlags():
     type: int = DataOrigin.ORIGINAL
     source: int = DataOrigin.ORIGINAL
@@ -173,7 +185,7 @@ class ParsedBankAccountTransaction():
     details: dict
     keywords: list
     comment: str
-    flags: ModifiedFlags
+    flags: ModifiedFlags = field(default_factory=ModifiedFlags)
     category: str= None
     tags: list = field(default_factory=list)
 
@@ -192,9 +204,32 @@ class ParsedCreditCardTransaction():
     details: dict
     keywords: list
     comment: str
-    flags: ModifiedFlags
+    flags: ModifiedFlags = field(default_factory=ModifiedFlags)
     category: str = None
     tags: list = field(default_factory=list)
+
+@dataclass
+class BankCreditCardTransaction():
+    transaction_id: str
+    type: TransactionType
+    currency: str
+    amount: float
+    value_date: str
+    transaction_date: str
+    source: TransactionSubject
+    destination: TransactionSubject
+    card: Card
+    details: dict
+    keywords: list
+    comment: str
+    category: Category = None
+    tags: list = field(default_factory=list)
+    flags: ModifiedFlags = field(default_factory=ModifiedFlags)
+    subtransactions: list = field(default_factory=list)
+    related: RelatedTransaction = None
+    _id: str = None
+    _seq: int = None
+
 
 @dataclass
 class BankAccountTransaction():
@@ -212,9 +247,11 @@ class BankAccountTransaction():
     details: dict
     keywords: list
     comment: str
-    flags: ModifiedFlags
-    category: str = None
+    category: Category = None
     tags: list = field(default_factory=list)
+    flags: ModifiedFlags = field(default_factory=ModifiedFlags)
+    subtransactions: list = field(default_factory=list)
+    related: RelatedTransaction = None
     _id: str = None
     _seq: int = None
 
@@ -231,8 +268,11 @@ class LocalAccountTransaction():
     account: LocalAccount
     keywords: list
     comment: str
-    category: str = None
+    category: Category = None
     tags: list = field(default_factory=list)
+    flags: ModifiedFlags = field(default_factory=ModifiedFlags)
+    subtransactions: list = field(default_factory=list)
+    related: RelatedTransaction = None
     _id: str = None
     _seq: int = None
 

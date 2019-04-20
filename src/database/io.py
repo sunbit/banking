@@ -150,19 +150,46 @@ def find_account_transactions(collection, account_number, since_seq_number=None,
     return results
 
 
-def transactions_match(transaction_1, transaction_2):
-    if transaction_1 is None or transaction_2 is None:
-        return False
+def find_matching_credit_card_transaction(collection, credit_card_number, transaction):
+    results = list(collection.find(
+        {
+            'card.number': credit_card_number,
+            'transaction_date.date': encode_date(transaction.transaction_date),
+            'amount': transaction.amount,
+            'transaction_id': transaction.transaction_id
+        },
+        sort=[('_seq', 1)]
+    ))
 
-    def field_equals(field):
-        return getattr(transaction_1, field) == getattr(transaction_2, field)
+    if not results:
+        return None
 
-    return all(
-        map(
-            field_equals,
-            ['transaction_date', 'amount', 'balance']
+    if len(results) > 1:
+        raise DatabaseError('Found more than one match for a transaction, check the algorithm')
+
+    return decode_transaction(results[0])
+
+
+def find_credit_card_transactions(collection, credit_card_number, since_seq_number=None, since_date=None):
+    query = {
+        'card.number': credit_card_number,
+    }
+
+    if since_seq_number is not None:
+        query['_seq'] = {"$gte": since_seq_number}
+
+    if since_date is not None:
+        query['transaction_date.date'] = {'$gte': encode_date(since_date)}
+
+    results = list(map(
+        decode_transaction,
+        collection.find(
+            query,
+            sort=[('_seq', 1)]
         )
-    )
+    ))
+
+    return results
 
 
 def align_decimal(number):
@@ -191,16 +218,22 @@ def check_balance_consistency(collection, account_number):
         # Fucking python floating point precission shit ...
         is_consistent = round(last_balance + transaction.amount, 2) == transaction.balance
         if not is_consistent:
+            import ipdb;ipdb.set_trace()
             return transaction
         last_balance = transaction.balance
 
     return None
 
 
-def select_new_transactions(fetched_transactions, db_transactions):
+def select_new_transactions(fetched_transactions, db_transactions, mode):
 
     def transaction_string(transaction):
-        return '{m.transaction_date} {m.amount} {m.balance}'.format(m=transaction).encode('utf-8')
+        if mode == 'account':
+            fields = '{m.transaction_date} {m.amount} {m.balance}'
+        elif mode == 'credit_card':
+            fields = '{m.transaction_date} {m.amount} {m.transaction_id}'
+
+        return fields.format(m=transaction).encode('utf-8')
 
     hashed_fetched_transactions = [
         (
@@ -248,7 +281,8 @@ def select_new_transactions(fetched_transactions, db_transactions):
         if action == '+':
             # We have a transaction in fetched that it's not on the database
             transaction = fetched_transactions_by_hash[transaction_hash]
-            new_transaction = datatypes.BankAccountTransaction(_seq=next_seq_number, **transaction.__dict__)
+            new_transaction = deepcopy(transaction)
+            new_transaction._seq = next_seq_number
             yield ('insert', new_transaction)
             next_seq_number += 1
             sequence_change_needed = True
@@ -266,7 +300,7 @@ def select_new_transactions(fetched_transactions, db_transactions):
             # this transaction is on both db and fetched transactions but we inserted
             # something that changed the sequence, so we need to update it
             stored_transaction = db_transactions_by_hash[transaction_hash]
-            updated_transaction = datatypes.BankAccountTransaction(**stored_transaction.__dict__)
+            updated_transaction = deepcopy(stored_transaction)
             updated_transaction._seq = next_seq_number
             yield ('update', updated_transaction)
             next_seq_number += 1
@@ -276,7 +310,7 @@ def select_new_transactions(fetched_transactions, db_transactions):
             # this transaction is only on db but as something happened
             # that changed the sequence, so we need to update it
             stored_transaction = db_transactions_by_hash[transaction_hash]
-            updated_transaction = datatypes.BankAccountTransaction(**stored_transaction.__dict__)
+            updated_transaction = deepcopy(stored_transaction)
             updated_transaction._seq = next_seq_number
             yield ('update', updated_transaction)
             next_seq_number += 1

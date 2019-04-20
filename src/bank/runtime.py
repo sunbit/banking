@@ -15,6 +15,7 @@ from common.notifications import notify
 import scrapper
 import database
 import rules
+import exceptions
 
 logger = get_logger(name='bank')
 
@@ -109,8 +110,19 @@ def scrap_bank_account_transactions(bank_module, bank_config, account_config, fr
     )
 
 
+def scrap_bank_credit_card_transactions(bank_module, bank_config, card_config, from_date, to_date):
+    browser = scrapper.new('./chromedriver', headless=True)
+    bank_module.login(browser, bank_config.username, bank_config.password)
+    return bank_module.get_credit_card_transactions(
+        browser,
+        card_config.number,
+        from_date,
+        to_date
+    )
+
+
 def update_bank_account_transactions(db, bank_config, account_config, from_date, to_date):
-    logger.info('Updating {bank.name} {account.id} transactions from {from_date} to {to_date}'.format(
+    logger.info('Updating {bank.name} account {account.id} transactions from {from_date} to {to_date}'.format(
         bank=bank_config,
         account=account_config,
         from_date=from_date.strftime('%d/%m/%Y'),
@@ -130,17 +142,44 @@ def update_bank_account_transactions(db, bank_config, account_config, from_date,
 
     added, _ = database.update_account_transactions(db, account_config.id, processed_transactions)
     if added:
-        logger.info('Successfully updated transactions database')
+        logger.info('Successfully updated account transactions database')
     else:
-        logger.info('There are no new transactions to update'.format(len(raw_transactions)))
+        logger.info('There are no new account transactions to update'.format(len(raw_transactions)))
     return added
 
 
-DATABASE_UPDATE_EXCEPTION_MESSAGE = """While updating *{bank.name}* account *{account.id}* transactions the following error occurred:
+def update_bank_credit_card_transactions(db, bank_config, account_config, card_config, from_date, to_date):
+    logger.info('Updating {bank.name} card {card.number} transactions from {from_date} to {to_date}'.format(
+        bank=bank_config,
+        card=card_config,
+        from_date=from_date.strftime('%d/%m/%Y'),
+        to_date=to_date.strftime('%d/%m/%Y')
+    ))
 
-    {message}
+    bank_module = load_module(bank_config.id)
+
+    raw_transactions = scrap_bank_credit_card_transactions(bank_module, bank_config, card_config, from_date, to_date)
+    logger.info('{} transactions fetched'.format(len(raw_transactions)))
+
+    parsed_transactions = parse_credit_card_transactions(bank_module, bank_config, account_config, card_config, raw_transactions)
+    logger.info('{} transactions parsed'.format(len(parsed_transactions)))
+
+    processed_transactions = rules.apply(rules.load(), parsed_transactions)
+    logger.info('Rules applied to {} transactions'.format(len(processed_transactions)))
+
+    added, _ = database.update_credit_card_transactions(db, card_config.number, processed_transactions)
+    if added:
+        logger.info('Successfully updated credit card transactions database')
+    else:
+        logger.info('There are no new card transactions to update'.format(len(raw_transactions)))
+    return added
+
+
+UPDATE_EXCEPTION_MESSAGE = """While updating *{bank.name}* {source} *{id}* transactions the following error occurred:
+
+{message}
 """
-UNKNOWN_UPDATE_EXCEPTION_MESSAGE = """While updating *{bank.name}* account *{account.id}* transactions the following error occurred:
+UNKNOWN_UPDATE_EXCEPTION_MESSAGE = """While updating *{bank.name}* {source} *{id}* transactions the following error occurred:
 
 ```
 {traceback}
@@ -156,7 +195,7 @@ def update_all(banking_config):
     for bank_id, bank in banking_config.banks.items():
         for account_number, account in bank.accounts.items():
             try:
-                last_transaction_date = database.last_transaction_date(db, account.id)
+                last_transaction_date = database.last_account_transaction_date(db, account.id)
                 if last_transaction_date is None:
                     # Query from beginning of current year
                     from_date = (datetime.now() + relativedelta(datetime.now(), day=1, month=1)).date()
@@ -167,6 +206,7 @@ def update_all(banking_config):
                 # Query until current day
                 to_date = datetime.now().date()
                 added = update_bank_account_transactions(db, bank, account, from_date, to_date)
+
                 if added:
                     success.append('Added {added} new transactions for *{bank.name}* account *{account.id}*'.format(
                         bank=bank,
@@ -174,16 +214,50 @@ def update_all(banking_config):
                         added=added
                     ))
             except database.DatabaseError as exc:
-                failure.append(DATABASE_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, account=account, message=str(exc)))
+                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
                 logger.error(str(exc))
             except Exception as exc:
-                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, account=account, traceback=traceback.format_exc()))
+                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, traceback=traceback.format_exc()))
                 logger.error(str(exc))
+            except (exceptions.SomethingChangedError, exceptions.SomethingChangedError) as exc:
+                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
+                logger.error(exc.message)
+
+    for card_number, card in banking_config.cards.items():
+        if card.type == 'credit' and card.active:
+            try:
+                last_transaction_date = database.last_credit_card_transaction_date(db, card.number)
+                if last_transaction_date is None:
+                    # Query from beginning of current year
+                    from_date = (datetime.now() + relativedelta(datetime.now(), day=1, month=1)).date()
+                else:
+                    # Query from beginning of previous day
+                    from_date = (last_transaction_date - relativedelta(days=1)).date()
+
+                # Query until current day
+                to_date = datetime.now().date()
+                card_account = banking_config.accounts[card.account_number]
+                card_bank = banking_config.banks[card_account.bank_id]
+                added = update_bank_credit_card_transactions(db, card_bank, card_account, card, from_date, to_date)
+
+                if added:
+                    success.append('Added {added} new transactions for *{bank.name}* card *{card.number}*'.format(
+                        bank=bank,
+                        card=card,
+                        added=added
+                    ))
+            except database.DatabaseError as exc:
+                failure.append(DATABASE_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=account.id, message=str(exc)))
+                logger.error(str(exc))
+            except Exception as exc:
+                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=account.id, traceback=traceback.format_exc()))
+                logger.error(str(exc))
+            except (exceptions.SomethingChangedError, exceptions.SomethingChangedError) as exc:
+                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
+                logger.error(exc.message)
 
     for item in success:
         notify(item)
 
     for item in failure:
         notify(item)
-
-

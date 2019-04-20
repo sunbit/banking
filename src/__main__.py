@@ -199,13 +199,28 @@ if __name__ == '__main__':
 
         if arguments['--update']:
             if source == 'account':
-                parsed_transactions = bank.parse_account_transactions(bank_module, bank_config, account_config, raw_transactions)
-                processed_transactions = rules.apply(rules.load(), parsed_transactions)
                 try:
-                    database.update_account_transactions(database.load(), account_config.id, processed_transactions)
+                    added = bank.update_bank_account_transactions(database.load(), bank_config, account_config, from_date, to_date)
                 except database.DatabaseError as exc:
                     print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
                     sys.exit(1)
+                print('Added {added} new transactions for *{bank.name}* account *{account.id}*'.format(
+                    bank=bank_config,
+                    account=account_config,
+                    added=added
+                ))
+            if source == 'card':
+                try:
+                    added = bank.update_bank_credit_card_transactions(database.load(), bank_config, account_config, credit_card_config, from_date, to_date)
+                except database.DatabaseError as exc:
+                    print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
+                    sys.exit(1)
+                print('Added {added} new transactions for *{bank.name}* card *{card.number}*'.format(
+                    bank=bank_config,
+                    card=credit_card_config,
+                    added=added
+                ))
+
 
     if action == 'load' and load_raw:
         raw_transactions = json.load(open(arguments['<raw-filename>']))

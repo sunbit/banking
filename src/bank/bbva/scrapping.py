@@ -40,7 +40,7 @@ def encode_date(dt):
 
 
 def login(browser, username, password):
-    log('Loading main page')
+    log('Loading BBVA main page')
     browser.get('https://www.bbva.es')
     browser.find_element_by_css_selector('#aceptarGDPR', visible=True).click()
 
@@ -62,7 +62,7 @@ def get_account_transactions(browser, account_number, from_date, to_date):
 
     browser.get('https://web.bbva.es/index.html')
 
-    log('Loading account page')
+    log('Loading BBVA account page')
     browser.find_elements_by_css_selector('p[role=link').filter(lambda element: account_number in element.text)[0].forced_click()
 
     log('Loading account advanced search')

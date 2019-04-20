@@ -21,7 +21,7 @@ def encode_date(dt):
 
 
 def login(browser, username, password):
-    log('Loading main page')
+    log('Loading BANKIA main page')
     browser.get('https://www.bankia.es')
     browser.driver.find_element_by_css_selector('a#CybotCookiebotDialogBodyButtonAccept').click()
 
@@ -48,7 +48,7 @@ def login(browser, username, password):
 
 def get_account_transactions(browser, account_number, from_date, to_date):
 
-    log('Loading account list page')
+    log('Loading BANKIA account list page')
     browser.get('https://www.bankia.es/oficina/particulares/#/cuentas')
 
     # Wait for page rendering all elements, otherwise the next queries change at some
@@ -182,7 +182,7 @@ def get_credit_card_transactions(browser, card_number, from_date, to_date):
         # Trigger pagination by clicking the "Ver mas resultados" button
         if still_have_results:
             log('Loading more results')
-            browser.find_element_by_css_selector('.masMovimientos').click()
+            browser.find_element_by_css_selector('.masMovimientos').forced_click()
             time.sleep(0.1)
 
     # results already sorted from older to newer, no need to reverse them

@@ -306,7 +306,6 @@ def parse_account_transaction(bank_config, account_config, transaction):
         details=details,
         keywords=keywords,
         comment=comment if comment is not None else '',
-        flags=ModifiedFlags()
     )
 
 
@@ -353,5 +352,4 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
         details=details,
         keywords=keywords,
         comment=comment if comment is not None else '',
-        flags=ModifiedFlags()
     )
