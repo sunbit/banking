@@ -1,4 +1,4 @@
-from datatypes import BankConfig, LocalAccountConfig, AccountConfig, CardConfig
+from datatypes import BankConfig, LocalAccountConfig, AccountConfig, CardConfig, NotificationsConfig
 
 
 def decode_bank(bank_config, accounts=[]):
@@ -37,4 +37,11 @@ def decode_card(card_config):
         card_config['owner'],
         card_config['active'],
         card_config['account'],
+    )
+
+
+def decode_notifications(notifications_config):
+    return NotificationsConfig(
+        notifications_config['telegram_api_key'],
+        notifications_config['telegram_chat_id']
     )

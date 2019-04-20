@@ -30,10 +30,17 @@ class TransactionDirection(Enum):
 
 
 @dataclass
+class NotificationsConfig:
+    telegram_api_key: str
+    telegram_chat_id: str
+
+
+@dataclass
 class Configuration:
     banks: dict
     accounts: dict
     cards: dict
+    notifications: NotificationsConfig
 
 
 @dataclass
@@ -68,7 +75,6 @@ class CardConfig:
     owner: str
     active: bool
     account_number: str
-
 
 @dataclass
 class UnknownSubject:

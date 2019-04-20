@@ -6,10 +6,10 @@ from datetime import datetime
 from functools import partial
 from dateutil.relativedelta import relativedelta
 
-from .io import decode_bank, decode_card, decode_account, decode_local_account
+from .io import decode_bank, decode_card, decode_account, decode_local_account, decode_notifications
 from datatypes import Configuration
 from common.logging import get_logger
-from common.notifications import notify
+from common.notifications import get_notifier
 
 
 import scrapper
@@ -58,7 +58,8 @@ def load_config(filename):
         return Configuration(
             banks=banks,
             accounts=accounts,
-            cards=cards
+            cards=cards,
+            notifications=decode_notifications(raw_configuration['notifications'])
         )
 
 
@@ -256,8 +257,10 @@ def update_all(banking_config):
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
                 logger.error(exc.message)
 
+    notifier = get_notifier(banking_config.notifications)
+
     for item in success:
-        notify(item)
+        notifier(item)
 
     for item in failure:
-        notify(item)
+        notifier(item)
