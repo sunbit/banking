@@ -28,15 +28,13 @@ def update_account_transactions(db, account_number, fetched_transactions):
     if not fetched_transactions:
         return
 
-    collection = db.account_transactions
-
     # Get from the database all the transactions starting with the
     # first one that matches the first fetched transaction
-    first_fetched_transaction = io.find_matching_account_transaction(collection, account_number, fetched_transactions[0])
+    first_fetched_transaction = io.find_matching_account_transaction(db, account_number, fetched_transactions[0])
     if first_fetched_transaction is not None:
-        existing_transactions = io.find_account_transactions(collection, account_number, since_seq_number=first_fetched_transaction._seq)
+        existing_transactions = io.find_account_transactions(db, account_number, since_seq_number=first_fetched_transaction._seq)
     else:
-        existing_transactions = io.find_account_transactions(collection, account_number, since_date=fetched_transactions[0].transaction_date)
+        existing_transactions = io.find_account_transactions(db, account_number, since_date=fetched_transactions[0].transaction_date)
 
     added = 0
     updated = 0
@@ -48,13 +46,13 @@ def update_account_transactions(db, account_number, fetched_transactions):
 
     for action, transaction in io.select_new_transactions(converted_transactions, existing_transactions, mode='account'):
         if action == 'insert':
-            collection.insert_one(io.encode_transaction(transaction))
+            io.insert_account_transaction(transaction)
             added += 1
         elif action == 'update':
-            collection.update({'_id': transaction._id}, io.encode_transaction(transaction))
+            io.update_account_transaction(transaction)
             updated += 1
 
-    inconsistent_transaction = io.check_balance_consistency(collection, account_number)
+    inconsistent_transaction = io.check_balance_consistency(db, account_number)
 
     if inconsistent_transaction:
         raise io.DatabaseError(
@@ -69,15 +67,13 @@ def update_credit_card_transactions(db, credit_card_number, fetched_transactions
     if not fetched_transactions:
         return
 
-    collection = db.credit_card_transactions
-
     # Get from the database all the transactions starting with the
     # first one that matches the first fetched transaction
-    first_fetched_transaction = io.find_matching_credit_card_transaction(collection, credit_card_number, fetched_transactions[0])
+    first_fetched_transaction = io.find_matching_credit_card_transaction(db, credit_card_number, fetched_transactions[0])
     if first_fetched_transaction is not None:
-        existing_transactions = io.find_credit_card_transactions(collection, credit_card_number, since_seq_number=first_fetched_transaction._seq)
+        existing_transactions = io.find_credit_card_transactions(db, credit_card_number, since_seq_number=first_fetched_transaction._seq)
     else:
-        existing_transactions = io.find_credit_card_transactions(collection, credit_card_number, since_date=fetched_transactions[0].transaction_date)
+        existing_transactions = io.find_credit_card_transactions(db, credit_card_number, since_date=fetched_transactions[0].transaction_date)
 
     added = 0
     updated = 0
@@ -89,10 +85,10 @@ def update_credit_card_transactions(db, credit_card_number, fetched_transactions
 
     for action, transaction in io.select_new_transactions(converted_transactions, existing_transactions, mode='credit_card'):
         if action == 'insert':
-            collection.insert_one(io.encode_transaction(transaction))
+            io.insert_credit_card_transaction(transaction)
             added += 1
         elif action == 'update':
-            collection.update({'_id': transaction._id}, io.encode_transaction(transaction))
+            io.update_credit_card_transaction(transaction)
             updated += 1
 
     return (added, updated)

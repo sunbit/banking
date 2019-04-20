@@ -108,7 +108,8 @@ def decode_transaction(document):
     return decoded
 
 
-def find_matching_account_transaction(collection, account_number, transaction):
+def find_matching_account_transaction(db, account_number, transaction):
+    collection = db.account_transactions
     results = list(collection.find(
         {
             'account.id': account_number,
@@ -128,10 +129,12 @@ def find_matching_account_transaction(collection, account_number, transaction):
     return decode_transaction(results[0])
 
 
-def find_account_transactions(collection, account_number, since_seq_number=None, since_date=None):
-    query = {
-        'account.id': account_number,
-    }
+def find_account_transactions(db, account_number=None, since_seq_number=None, since_date=None):
+    collection = db.account_transactions
+    query = {}
+
+    if account_number is not None:
+        query['account.id'] = account_number
 
     if since_seq_number is not None:
         query['_seq'] = {"$gte": since_seq_number}
@@ -150,7 +153,18 @@ def find_account_transactions(collection, account_number, since_seq_number=None,
     return results
 
 
-def find_matching_credit_card_transaction(collection, credit_card_number, transaction):
+def insert_account_transaction(db, transaction):
+    collection = db.account_transactions
+    return collection.insert_one(encode_transaction(transaction))
+
+
+def update_account_transaction(db, transaction):
+    collection = db.account_transactions
+    return collection.update({'_id': transaction._id}, encode_transaction(transaction))
+
+
+def find_matching_credit_card_transaction(db, credit_card_number, transaction):
+    collection = db.credit_card_transactions
     results = list(collection.find(
         {
             'card.number': credit_card_number,
@@ -170,10 +184,12 @@ def find_matching_credit_card_transaction(collection, credit_card_number, transa
     return decode_transaction(results[0])
 
 
-def find_credit_card_transactions(collection, credit_card_number, since_seq_number=None, since_date=None):
-    query = {
-        'card.number': credit_card_number,
-    }
+def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=None, since_date=None):
+    collection = db.credit_card_transactions
+    query = {}
+
+    if credit_card_number is not None:
+        query['card.number'] = credit_card_number
 
     if since_seq_number is not None:
         query['_seq'] = {"$gte": since_seq_number}
@@ -190,6 +206,16 @@ def find_credit_card_transactions(collection, credit_card_number, since_seq_numb
     ))
 
     return results
+
+
+def insert_credit_card_transaction(db, transaction):
+    collection = db.credit_card_transactions
+    return collection.insert_one(encode_transaction(transaction))
+
+
+def update_credit_card_transaction(db, transaction):
+    collection = db.credit_card_transactions
+    return collection.update({'_id': transaction._id}, encode_transaction(transaction))
 
 
 def align_decimal(number):
@@ -209,7 +235,8 @@ def log_action(transaction, action):
     ))
 
 
-def check_balance_consistency(collection, account_number):
+def check_balance_consistency(db, account_number):
+    collection = db.account_transactions
     results = find_account_transactions(collection, account_number)
 
     last_balance = results[0].balance
