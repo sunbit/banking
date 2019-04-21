@@ -28,6 +28,13 @@ class MatchCondition(RuleCondition):
     regex: str = None
 
 
+@dataclass
+class MatchNumericCondition(RuleCondition):
+    fieldname: str
+    value: list
+    operator: object
+    absolute: bool = False
+
 
 @dataclass
 class ValueSetter(RuleAction):

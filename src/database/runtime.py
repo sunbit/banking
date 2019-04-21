@@ -46,10 +46,10 @@ def update_account_transactions(db, account_number, fetched_transactions):
 
     for action, transaction in io.select_new_transactions(converted_transactions, existing_transactions, mode='account'):
         if action == 'insert':
-            io.insert_account_transaction(transaction)
+            io.insert_account_transaction(db, transaction)
             added += 1
         elif action == 'update':
-            io.update_account_transaction(transaction)
+            io.update_account_transaction(db, transaction)
             updated += 1
 
     inconsistent_transaction = io.check_balance_consistency(db, account_number)
@@ -85,10 +85,17 @@ def update_credit_card_transactions(db, credit_card_number, fetched_transactions
 
     for action, transaction in io.select_new_transactions(converted_transactions, existing_transactions, mode='credit_card'):
         if action == 'insert':
-            io.insert_credit_card_transaction(transaction)
+            io.insert_credit_card_transaction(db, transaction)
             added += 1
         elif action == 'update':
-            io.update_credit_card_transaction(transaction)
+            io.update_credit_card_transaction(db, transaction)
             updated += 1
 
     return (added, updated)
+
+
+def update_transaction(db, transaction):
+    {
+        BankAccountTransaction: io.update_account_transaction,
+        BankCreditCardTransaction: io.update_credit_card_transaction
+    }[transaction.__class__](db, transaction)

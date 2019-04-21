@@ -1,6 +1,6 @@
 from datatypes import TransactionType, Issuer
-from rules.io import _check_MatchCondition
-from rules.io import Match, MatchAny, MatchAll
+from rules.io import _check_MatchCondition, _check_MatchNumericCondition
+from rules.io import Match, MatchAny, MatchAll, MatchNumeric
 
 from .helpers import make_transaction
 
@@ -110,3 +110,24 @@ def test_match_regex_value_match():
     assert _check_MatchCondition(condition_any, transaction_0) is True
     assert _check_MatchCondition(condition_all, transaction_0) is True
 
+
+def test_numeric_condition():
+    transaction_0 = make_transaction(amount=-13.99)
+
+    condition_0 = MatchNumeric('amount', 13.99, operator='eq', absolute=True)
+    condition_1 = MatchNumeric('amount', 13.99, operator='eq')
+    condition_2 = MatchNumeric('amount', 13, operator='gt', absolute=True)
+    condition_3 = MatchNumeric('amount', -13, operator='lt', absolute=False)
+
+    assert _check_MatchNumericCondition(condition_0, transaction_0) is True
+    assert _check_MatchNumericCondition(condition_1, transaction_0) is False
+    assert _check_MatchNumericCondition(condition_2, transaction_0) is True
+    assert _check_MatchNumericCondition(condition_3, transaction_0) is True
+
+
+def test_unset():
+    transaction = make_transaction(category=None)
+
+    condition = Match('category', None)
+
+    assert _check_MatchCondition(condition, transaction) is True

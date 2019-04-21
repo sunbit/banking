@@ -5,6 +5,7 @@ Usage:
   banking get <bank> (account|card) transactions [options]
   banking load <bank> (account|card) transactions [options]
   banking load all transactions [--filter=<filters>]
+  banking apply rules
   banking load <bank> (account|card) raw transactions <raw-filename> [options]
   banking run server
   banking (-h | --help)
@@ -88,7 +89,7 @@ def table(records, show_balance=True):
         if show_balance:
             row.append(record.balance)
         row.append(record.type.value if record.type is not None else '--')
-        row.append(record.category if record.category is not None else '--')
+        row.append(record.category.name if record.category is not None else '--')
         row.append('{card.name}: {card.number}'.format(card=record.card) if record.card is not None else '')
         row.append(format_destination(record.source))
         row.append(format_destination(record.destination))
@@ -105,7 +106,7 @@ def table(records, show_balance=True):
 
 
 def table_all(records, filters=[]):
-    headers = ['Date', 'Origin', 'Amount', 'Type', 'Source', 'Destination', 'Category', 'Tags', ]
+    headers = ['Date', 'Origin', 'Amount', 'Type', 'Source', 'Destination', 'Category', 'Tags', 'Comment']
 
     def format_destination(destination):
         if destination is None:
@@ -120,17 +121,24 @@ def table_all(records, filters=[]):
     def prepare_row(record):
 
         record_type = 'card' if isinstance(record, datatypes.BankCreditCardTransaction) else 'account'
+        method = {
+            ('account', False): 'account',
+            ('account', True): 'debit card',
+            ('card', False): 'credit card',
+            ('card', True): 'credit card',
+        }[(record_type, record.card is not None)]
         bank = 'BBVA' if 'BBVA' in getattr(record, record_type).name.upper() else 'BANKIA'
 
         row = []
         row.append(record.transaction_date.strftime('%Y/%m/%d'))
-        row.append('{}:{}'.format(bank, record_type))
+        row.append('{}:{}'.format(bank, method))
         row.append(record.amount)
         row.append(record.type.value if record.type is not None else '--')
         row.append(format_destination(record.source))
         row.append(format_destination(record.destination))
-        row.append(record.category if record.category is not None else '--')
+        row.append(record.category.name if record.category is not None else '--')
         row.append(', '.join(record.tags))
+        row.append(record.comment)
         return row
 
     rows = [
@@ -161,14 +169,14 @@ if __name__ == '__main__':
     arguments = docopt(__doc__, version='Banking 1.0')
     banking_configuration = bank.load_config('banking.yaml')
 
-    action = list(filter(lambda action: arguments[action] is True, ['get', 'load']))[0]
+    action = list(filter(lambda action: arguments[action] is True, ['get', 'load', 'apply']))[0]
 
     load_raw = arguments['raw']
     load_all = arguments['all']
 
     if arguments['server'] and arguments['run']:
         app.run(banking_configuration)
-        sys.exit(1)
+        sys.exit(0)
 
     if action == 'load' and load_all:
         db = database.load()
@@ -177,8 +185,29 @@ if __name__ == '__main__':
 
         all_transactions = sorted(chain(account_transactions, credit_card_transactions), key=attrgetter('transaction_date'))
 
-        print(table_all(all_transactions, filters=list(map(lambda f: f.lower(), arguments['--filter'].split(',')))))
+        filters_argument = arguments['--filter'] if arguments['--filter'] is not None else ''
+        parsed_filters = list(map(lambda f: f.lower(), filters_argument.split(',')))
+        print(table_all(all_transactions, filters=parsed_filters))
         sys.exit(0)
+
+    if action == 'apply' and arguments['rules']:
+        db = database.load()
+        account_transactions = database.io.find_account_transactions(db)
+        credit_card_transactions = database.io.find_credit_card_transactions(db)
+
+        all_transactions = sorted(chain(account_transactions, credit_card_transactions), key=attrgetter('transaction_date'))
+
+        processed_transactions = rules.apply(rules.load(), all_transactions)
+
+        changed = 0
+        for old_transaction, new_transaction in zip(all_transactions, processed_transactions):
+            if old_transaction != new_transaction:
+                database.update_transaction(db, new_transaction)
+                changed += 1
+
+        print('Updated {} of {} transactions'.format(changed, len(processed_transactions)))
+
+        sys.exit(1)
 
     bank_id = arguments['<bank>']
     headless = not arguments['--debug-browser']

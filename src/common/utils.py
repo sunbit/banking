@@ -72,3 +72,5 @@ class AutoJSONEncoder(JSONEncoder):
             return raw_dictionary
 
         return JSONEncoder.default(self, obj)
+
+

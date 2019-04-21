@@ -2,11 +2,13 @@ from itertools import chain
 from functools import partial, reduce
 from copy import deepcopy
 
+import operator as operator_module
+
 from common.utils import get_nested_item
 from common.logging import get_logger
 from . import domain
 from .domain import AND, OR
-from .domain import MatchCondition, ValueSetter, ValueAdder
+from .domain import MatchCondition, MatchNumericCondition, ValueSetter, ValueAdder
 
 import datatypes
 import re
@@ -16,7 +18,8 @@ logger = get_logger(name='rules')
 
 FIELD_WRAPPERS = {
     'source': datatypes.Issuer,
-    'destination': datatypes.Recipient
+    'destination': datatypes.Recipient,
+    'category': lambda x: x
 }
 
 DEFAULT_FIELD_WRAPPER = str
@@ -73,7 +76,10 @@ def _run_ValueSetter(action, transaction):
     transaction_copy = deepcopy(transaction)
     try:
         raw_value = action.get_value(transaction)
-        value = raw_value.format(details=transaction.details, transaction=transaction)
+        if isinstance(raw_value, str):
+            value = raw_value.format(details=transaction.details, transaction=transaction)
+        else:
+            value = raw_value
     except (KeyError, AttributeError, TypeError) as exc:
         print('WARNING: Failed to run action {} "{}": {}'.format(action.__class__.__name__, action.fieldname, exc.__repr__()))
         return transaction_copy
@@ -114,11 +120,26 @@ def MatchAny(fieldname, *values, regex=None):
     return MatchCondition(fieldname, values, OR, regex)
 
 
+def MatchNumeric(fieldname, value, operator, absolute=False):
+    return MatchNumericCondition(
+        fieldname,
+        value,
+        getattr(operator_module, operator),
+        absolute
+    )
+
+
 def initial_value(operator):
     if operator == AND:
         return True
     if operator == OR:
         return False
+
+
+def _check_MatchNumericCondition(condition, transaction):
+    field_value = get_nested_item(transaction, condition.fieldname)
+    field_value = abs(field_value) if condition.absolute else field_value
+    return condition.operator(field_value, condition.value)
 
 
 def _check_MatchCondition(condition, transaction):
@@ -156,9 +177,12 @@ def _check_MatchCondition(condition, transaction):
 
     if isinstance(field_value, list):
         value_checker = included
-    elif condition.regex is None:
+    elif not condition.regex:
         value_checker = equals
-    elif condition.regex == 'search':
+    # Cannot do a regex on a None
+    elif field_value is None:
+        return False
+    if condition.regex == 'search':
         value_checker = search
     elif condition.regex == 'match':
         value_checker = match
@@ -173,6 +197,8 @@ def _check_MatchCondition(condition, transaction):
 def check_condition(transaction, condition):
     if isinstance(condition, domain.MatchCondition):
         return _check_MatchCondition(condition, transaction)
+    if isinstance(condition, domain.MatchNumericCondition):
+        return _check_MatchNumericCondition(condition, transaction)
 
 
 def matching_rules(user_rules, transaction):

@@ -7,7 +7,7 @@ from functools import partial
 from dateutil.relativedelta import relativedelta
 
 from .io import decode_bank, decode_card, decode_account, decode_local_account, decode_notifications
-from datatypes import Configuration
+from datatypes import Configuration, Category
 from common.logging import get_logger
 from common.notifications import get_notifier
 
@@ -61,6 +61,26 @@ def load_config(filename):
             cards=cards,
             notifications=decode_notifications(raw_configuration['notifications'])
         )
+
+
+def load_categories(filename):
+    def find_categories(categories, parent=None):
+        for category_config in raw_categories:
+            yield Category(
+                id=category_config['id'],
+                name=category_config['name'],
+                parent=parent
+            )
+            for subcategory_config in category_config.get('subcategories', []):
+                yield Category(
+                    id=subcategory_config['id'],
+                    name=subcategory_config['name'],
+                    parent=category_config['id']
+                )
+
+    with open(filename) as categories_file:
+        raw_categories = yaml.load(categories_file, Loader=yaml.FullLoader)
+        return {category.id: category for category in find_categories(raw_categories)}
 
 
 def load_module(bank_id):
