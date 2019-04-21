@@ -434,6 +434,26 @@ _rules = [
             Set('destination', 'Llibreria Mater'),
         ]
     ),
+
+    Rule(
+        conditions=[
+            Match('type', TransactionType.PURCHASE),
+            Match('keywords', 'WALLAPOP'),
+        ],
+        actions=[
+            Set('destination', 'Wallapop'),
+        ]
+    ),
+    Rule(
+        conditions=[
+            Match('type', TransactionType.PURCHASE_RETURN),
+            Match('keywords', 'WALLAPOP'),
+        ],
+        actions=[
+            Set('source', 'Wallapop'),
+        ]
+    ),
+
     # ---------------------------------------------------------
     # Rules to set comments to help understand the transaction
     # ---------------------------------------------------------
@@ -586,6 +606,15 @@ _rules = [
     Rule(
         conditions=[
             Match('type', TransactionType.PURCHASE),
+            Match('destination', 'dosfarma', regex='search')
+        ],
+        actions=[
+            Set('category', categories['farmacia'])
+        ]
+    ),
+    Rule(
+        conditions=[
+            Match('type', TransactionType.PURCHASE),
             MatchAny('destination', r'eysa', r'aparcament', r'wesmartpark', r'A\.C\.E\.S\.A', r'tunels\s+vallvi', r'invicat.*?mollet', r'par(k|qu)ing', regex='search')
         ],
         actions=[
@@ -613,7 +642,7 @@ _rules = [
     Rule(
         conditions=[
             Match('type', TransactionType.PURCHASE),
-            MatchAny('destination', r'wellindal', r'la redoute', r'esports\s+everest', r'Jip moda', r'privalia', r'h&m', regex='search')
+            MatchAny('destination', r'la redoute', r'esports\s+everest', r'Jip moda', r'privalia', r'h&m', regex='search')
         ],
         actions=[
             Set('category', categories['roba_calcat'])
@@ -843,7 +872,7 @@ _rules = [
     Rule(
         conditions=[
             Match('type', TransactionType.PURCHASE),
-            Match('destination', r'llibreria', regex='search'),
+            MatchAny('destination', r'llibreria', 'monpaper', regex='search'),
         ],
         actions=[
             Set('category', categories['llibreria_papereria']),
@@ -852,10 +881,20 @@ _rules = [
     Rule(
         conditions=[
             Match('type', TransactionType.PURCHASE),
-            MatchAll('destinatin', 'geni', 'perruquers', regex='search'),
+            MatchAll('destination', 'geni', 'perruquers', regex='search'),
         ],
         actions=[
             Set('category', categories['perruqueria']),
         ]
     ),
+    Rule(
+        conditions=[
+            Match('type', TransactionType.PURCHASE),
+            Match('keywords', 'OPTICA'),
+        ],
+        actions=[
+            Set('category', categories['optica']),
+        ]
+    ),
+
 ]
