@@ -169,12 +169,12 @@ if __name__ == '__main__':
     arguments = docopt(__doc__, version='Banking 1.0')
     banking_configuration = bank.load_config('banking.yaml')
 
-    action = list(filter(lambda action: arguments[action] is True, ['get', 'load', 'apply']))[0]
+    action = list(filter(lambda action: arguments[action] is True, ['get', 'load', 'apply', 'run']))[0]
 
     load_raw = arguments['raw']
     load_all = arguments['all']
 
-    if arguments['server'] and arguments['run']:
+    if action == "run" and arguments['server']:
         app.run(banking_configuration)
         sys.exit(0)
 
