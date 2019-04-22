@@ -22,10 +22,10 @@ COPY Pipfile /app/Pipfile
 COPY Pipfile.lock /app/Pipfile.lock
 
 RUN pip install pipenv
-RUN pipenv install --python /usr/local/bin/python --system
-
+RUN pipenv install --python /usr/local/bin/python --deploy --system
 
 COPY src /app/src
 COPY banking.yaml /app
+COPY categories.yaml /app
 
 

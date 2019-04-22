@@ -1,5 +1,5 @@
 *
 !src
-!banking.yaml
+!*.yaml
 !Pipfile*
 Dockerfile
