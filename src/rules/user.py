@@ -3,9 +3,9 @@ from .io import Match, MatchAll, MatchAny, MatchNumeric
 from .io import Set, SetFromCapture, Add
 from datatypes import TransactionType
 
-from bank import load_categories
+from bank import load_categories, env
 
-categories = load_categories('categories.yaml')
+categories = load_categories(env()['categories_file'])
 
 
 _rules = [
@@ -64,7 +64,7 @@ _rules = [
         actions=[
             Set('source', 'Fundació Escola Vedruna'),
             Set('comment', 'Nòmina Núria'),
-            Add('tags', 'nomina')
+            Set('category', categories['nomines'])
         ]
     ),
     Rule(
@@ -521,7 +521,7 @@ _rules = [
             MatchNumeric('amount', 500, operator='gt')
         ],
         actions=[
-            Add('tags', 'nomina'),
+            Set('category', categories['nomines'])
         ]
     ),
 
@@ -548,14 +548,13 @@ _rules = [
             Set('category', categories['supermercat'])
         ]
     ),
-
     Rule(
         conditions=[
             Match('type', TransactionType.PURCHASE),
-            Match('destination', r'guissona', regex='search')
+            MatchAny('destination', r'guissona', r'can codina', 'fussimanya', regex='search'),
         ],
         actions=[
-            Set('category', categories['carnisseria'])
+            Set('category', categories['carn_embotits']),
         ]
     ),
     Rule(
@@ -564,7 +563,7 @@ _rules = [
             Match('destination', r'fisio', regex='search')
         ],
         actions=[
-            Set('category', categories['salut'])
+            Set('category', categories['metges'])
         ]
     ),
     Rule(
@@ -683,15 +682,6 @@ _rules = [
     Rule(
         conditions=[
             Match('type', TransactionType.PURCHASE),
-            MatchAny('destination', 'can codina', 'fussimanya', regex='search'),
-        ],
-        actions=[
-            Set('category', categories['carnisseria']),
-        ]
-    ),
-    Rule(
-        conditions=[
-            Match('type', TransactionType.PURCHASE),
             Match('destination', 'itv', regex='match'),
         ],
         actions=[
@@ -713,7 +703,7 @@ _rules = [
             MatchAll('keywords', 'CLINICA', 'DENTAL'),
         ],
         actions=[
-            Set('category', categories['salut']),
+            Set('category', categories['metges']),
         ]
     ),
     Rule(
@@ -722,7 +712,7 @@ _rules = [
             MatchAll('keywords', 'RACO', 'PANARRA'),
         ],
         actions=[
-            Set('category', categories['fleca']),
+            Set('category', categories['pa']),
         ]
     ),
     Rule(
@@ -829,7 +819,7 @@ _rules = [
             Match('destination', r'fruites jimenez', regex='search'),
         ],
         actions=[
-            Set('category', categories['fruiteria']),
+            Set('category', categories['fruita_verdura']),
         ]
     ),
     Rule(
