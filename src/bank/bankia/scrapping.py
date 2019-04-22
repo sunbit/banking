@@ -139,7 +139,7 @@ def get_credit_card_transactions(browser, card_number, from_date, to_date):
 
     log('Load advanced search')
     credit_card_row.find_element_by_css_selector('ul li a[href*="movimientos"]').click()
-    browser.find_element_by_css_selector('form#formFiltroMovimientosTarjetas div[role="button"]').click()
+    browser.find_element_by_css_selector('form#formFiltroMovimientosTarjetas div[role="button"]').forced_click()
 
     log('Filling date query parameters')
     time.sleep(2)
