@@ -1,15 +1,25 @@
+import re
 import schedule
 import _thread
 import time
 
 from functools import partial
+from common.logging import get_logger
 
 import bank
 
+logger = get_logger(name='scheduler')
+
 
 def schedule_loop():
+    logger.info('Starting scheduler')
+    for count, job in enumerate(schedule.jobs, start=1):
+        logger.info('Job #{} of {}: {}'.format(
+            count,
+            len(schedule.jobs),
+            re.sub(r'(.*?)do.*', r'\1execute "{}"'.format(list(job.tags)[0]), job.__repr__())
+        ))
     while True:
-        print('Run pending')
         try:
             schedule.run_pending()
         except Exception as exc:
@@ -17,11 +27,25 @@ def schedule_loop():
         time.sleep(2)
 
 
-def run(bank_config):
+def run_once(task, task_name):
 
-    execute_update_all = partial(bank.update_all, bank_config)
-    execute_update_all()
+    def wrapper():
+        time.sleep(2)
+        logger.info('Running one-time task "{}"'.format(task_name))
+        task()
+        logger.info('Finished one-time task "{}"'.format(task_name))
 
-    #schedule.every().day.at("08:30").do(partial(bank.update_all, bank_config))
-    schedule.every(1).minutes.do(execute_update_all)
+    _thread.start_new_thread(wrapper, ())
+
+
+def run(config):
+    execute_update_all = partial(bank.update_all, config, bank.env())
+
+    for scrapping_hour in config.scheduler.scrapping_hours:
+        schedule.every().day.at(scrapping_hour).do(execute_update_all).tag('Update all transactions from banks', 'run_at_start')
+
+    # Start scheduling thread
     _thread.start_new_thread(schedule_loop, ())
+
+    # Run the scrapping job once, non blocking
+    run_once(execute_update_all, 'Update all transactions from banks')

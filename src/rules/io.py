@@ -208,11 +208,25 @@ def matching_rules(user_rules, transaction):
 
 
 def apply_rules_to_transaction(user_rules, transaction):
-    updated_transaction = reduce(
-        run_action,
-        chain.from_iterable(
-            (rule.actions for rule in matching_rules(user_rules, transaction))
-        ),
-        transaction
-    )
+    def process(transaction):
+        return reduce(
+            run_action,
+            chain.from_iterable(
+                (rule.actions for rule in matching_rules(user_rules, transaction))
+            ),
+            transaction
+        )
+    original_transaction = transaction
+    updated_transaction = process(original_transaction)
+
+    needs_reprocessing = original_transaction != updated_transaction
+    # We need to reprocess all rules for a transaction in case any
+    # action has been executed, as maybe now some other rules needs
+    # to be applied. The stop poing is when after processing, no changes are detected.
+
+    while needs_reprocessing:
+        original_transaction = updated_transaction
+        updated_transaction = process(original_transaction)
+        needs_reprocessing = original_transaction != updated_transaction
+
     return updated_transaction

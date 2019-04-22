@@ -1,12 +1,13 @@
 import importlib
 import traceback
 import yaml
+import os
 
 from datetime import datetime
 from functools import partial
 from dateutil.relativedelta import relativedelta
 
-from .io import decode_bank, decode_card, decode_account, decode_local_account, decode_notifications
+from .io import decode_bank, decode_card, decode_account, decode_local_account, decode_notifications, decode_scheduler_configuration
 from datatypes import Configuration, Category
 from common.logging import get_logger
 from common.notifications import get_notifier
@@ -18,6 +19,14 @@ import rules
 import exceptions
 
 logger = get_logger(name='bank')
+
+
+def env():
+    return {
+        'database_folder': os.getenv('BANKING_DATABASE_FOLDER', './database'),
+        'main_config_file': os.getenv('BANKING_CONFIG_FILE', './banking.yaml'),
+        'categories_file': os.getenv('BANKING_CATEGORIES_FILE', './categories.yaml'),
+    }
 
 
 def get_account_decoder(raw_account_config):
@@ -59,7 +68,8 @@ def load_config(filename):
             banks=banks,
             accounts=accounts,
             cards=cards,
-            notifications=decode_notifications(raw_configuration['notifications'])
+            notifications=decode_notifications(raw_configuration['notifications']),
+            scheduler=decode_scheduler_configuration(raw_configuration['scheduler'])
         )
 
 
@@ -208,18 +218,18 @@ UNKNOWN_UPDATE_EXCEPTION_MESSAGE = """While updating *{bank.name}* {source} *{id
 """
 
 
-def update_all(banking_config):
+def update_all(banking_config, env):
     success = []
     failure = []
 
-    db = database.load()
+    db = database.load(env['database_folder'])
     for bank_id, bank in banking_config.banks.items():
         for account_number, account in bank.accounts.items():
             try:
                 last_transaction_date = database.last_account_transaction_date(db, account.id)
                 if last_transaction_date is None:
-                    # Query from beginning of current year
-                    from_date = (datetime.now() + relativedelta(datetime.now(), day=1, month=1)).date()
+                    # Query from beginning of previous year
+                    from_date = (datetime.now() + relativedelta(month=1, day=1, years=-1)).date()
                 else:
                     # Query from beginning of previous day
                     from_date = (last_transaction_date - relativedelta(days=1)).date()
@@ -268,7 +278,7 @@ def update_all(banking_config):
                         added=added
                     ))
             except database.DatabaseError as exc:
-                failure.append(DATABASE_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=account.id, message=str(exc)))
+                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=account.id, message=str(exc)))
                 logger.error(str(exc))
             except Exception as exc:
                 failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=account.id, traceback=traceback.format_exc()))

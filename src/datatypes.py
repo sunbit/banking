@@ -36,11 +36,17 @@ class NotificationsConfig:
 
 
 @dataclass
+class SchedulerConfig:
+    scrapping_hours: list
+
+
+@dataclass
 class Configuration:
     banks: dict
     accounts: dict
     cards: dict
     notifications: NotificationsConfig
+    scheduler: SchedulerConfig
 
 
 @dataclass
@@ -75,6 +81,7 @@ class CardConfig:
     owner: str
     active: bool
     account_number: str
+
 
 @dataclass
 class UnknownSubject:

@@ -1,4 +1,4 @@
-from datatypes import BankConfig, LocalAccountConfig, AccountConfig, CardConfig, NotificationsConfig
+from datatypes import BankConfig, LocalAccountConfig, AccountConfig, CardConfig, NotificationsConfig, SchedulerConfig
 
 
 def decode_bank(bank_config, accounts=[]):
@@ -44,4 +44,10 @@ def decode_notifications(notifications_config):
     return NotificationsConfig(
         notifications_config['telegram_api_key'],
         notifications_config['telegram_chat_id']
+    )
+
+
+def decode_scheduler_configuration(scheduler_config):
+    return SchedulerConfig(
+        scheduler_config['scrapping_hours'],
     )

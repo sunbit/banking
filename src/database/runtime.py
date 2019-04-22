@@ -6,8 +6,8 @@ from . import io
 from datatypes import BankAccountTransaction, BankCreditCardTransaction
 
 
-def load():
-    connection = TinyMongoClient('database')
+def load(database_folder):
+    connection = TinyMongoClient(database_folder)
     db = getattr(connection, 'banking')
     return db
 

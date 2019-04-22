@@ -167,7 +167,7 @@ def parse_date(date_string):
 
 if __name__ == '__main__':
     arguments = docopt(__doc__, version='Banking 1.0')
-    banking_configuration = bank.load_config('banking.yaml')
+    banking_configuration = bank.load_config(bank.env()['main_config_file'])
 
     action = list(filter(lambda action: arguments[action] is True, ['get', 'load', 'apply', 'run']))[0]
 
@@ -179,7 +179,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if action == 'load' and load_all:
-        db = database.load()
+        db = database.load(bank.env()['database_folder'])
         account_transactions = database.io.find_account_transactions(db)
         credit_card_transactions = database.io.find_credit_card_transactions(db)
 
@@ -191,7 +191,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if action == 'apply' and arguments['rules']:
-        db = database.load()
+        db = database.load(bank.env()['database_folder'])
         account_transactions = database.io.find_account_transactions(db)
         credit_card_transactions = database.io.find_credit_card_transactions(db)
 
@@ -297,7 +297,7 @@ if __name__ == '__main__':
         if arguments['--update']:
             if source == 'account':
                 try:
-                    added = bank.update_bank_account_transactions(database.load(), bank_config, account_config, from_date, to_date)
+                    added = bank.update_bank_account_transactions(database.load(bank.env()['database_folder']), bank_config, account_config, from_date, to_date)
                 except database.DatabaseError as exc:
                     print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
                     sys.exit(1)
@@ -308,7 +308,7 @@ if __name__ == '__main__':
                 ))
             if source == 'card':
                 try:
-                    added = bank.update_bank_credit_card_transactions(database.load(), bank_config, account_config, credit_card_config, from_date, to_date)
+                    added = bank.update_bank_credit_card_transactions(database.load(bank.env()['database_folder']), bank_config, account_config, credit_card_config, from_date, to_date)
                 except database.DatabaseError as exc:
                     print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
                     sys.exit(1)
