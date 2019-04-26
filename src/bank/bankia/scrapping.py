@@ -65,7 +65,7 @@ def get_account_transactions(browser, account_number, from_date, to_date):
 
     log('Loading account advanced search')
     forced_click(account_row.find_element_by_css_selector('div[role=button].dropdown'))
-    browser.find_element_by_css_selector('li a[href="#/cuentas/movimientos"]').click()
+    browser.find_element_by_css_selector('li a[href="#/cuentas/movimientos"]').forced_click()
     browser.find_element_by_css_selector('oip-drop-section-search div[role="button"] i').forced_click()
 
     log('Filling date query parameters')
@@ -80,7 +80,7 @@ def get_account_transactions(browser, account_number, from_date, to_date):
     browser.driver.execute_script(script)
 
     log('Launching the initial search')
-    browser.find_elements_by_css_selector('button').filter(lambda element: 'Buscar' in element.text)[0].focus().click()
+    browser.find_elements_by_css_selector('button').filter(lambda element: 'Buscar' in element.text)[0].focus().forced_click()
 
     intercepted_responses = []
     intercepted_responses_count = 0

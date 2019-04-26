@@ -133,23 +133,29 @@ def parse_credit_card_transactions(bank_module, bank_config, account_config, cre
 def scrap_bank_account_transactions(bank_module, bank_config, account_config, from_date, to_date):
     browser = scrapper.new('./chromedriver', headless=True)
     bank_module.login(browser, bank_config.username, bank_config.password)
-    return bank_module.get_account_transactions(
+    transactions = bank_module.get_account_transactions(
         browser,
         account_config.id,
         from_date,
         to_date
     )
+    browser.close()
+    browser.quit()
+    return transactions
 
 
 def scrap_bank_credit_card_transactions(bank_module, bank_config, card_config, from_date, to_date):
     browser = scrapper.new('./chromedriver', headless=True)
     bank_module.login(browser, bank_config.username, bank_config.password)
-    return bank_module.get_credit_card_transactions(
+    transactions = bank_module.get_credit_card_transactions(
         browser,
         card_config.number,
         from_date,
         to_date
     )
+    browser.close()
+    browser.quit()
+    return transactions
 
 
 def update_bank_account_transactions(db, bank_config, account_config, from_date, to_date):
@@ -250,7 +256,7 @@ def update_all(banking_config, env):
             except Exception as exc:
                 failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, traceback=traceback.format_exc()))
                 logger.error(str(exc))
-            except (exceptions.SomethingChangedError, exceptions.SomethingChangedError) as exc:
+            except (exceptions.SomethingChangedError, exceptions.InteractionError) as exc:
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
                 logger.error(exc.message)
 
@@ -283,7 +289,7 @@ def update_all(banking_config, env):
             except Exception as exc:
                 failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=account.id, traceback=traceback.format_exc()))
                 logger.error(str(exc))
-            except (exceptions.SomethingChangedError, exceptions.SomethingChangedError) as exc:
+            except (exceptions.SomethingChangedError, exceptions.InteractionError) as exc:
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
                 logger.error(exc.message)
 
