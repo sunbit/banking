@@ -172,16 +172,22 @@ def update_bank_account_transactions(db, bank_config, account_config, from_date,
     logger.info('{} transactions fetched'.format(len(raw_transactions)))
 
     parsed_transactions = parse_account_transactions(bank_module, bank_config, account_config, raw_transactions)
-    logger.info('{} transactions parsed'.format(len(parsed_transactions)))
+    filtered_transactions = list(filter(
+        lambda transaction: transaction.transaction_date >= from_date,
+        parsed_transactions
+    ))
+    discarded_transactions_count = len(parsed_transactions) - len(filtered_transactions)
+    filtered_info = ' ({} out of date range got filtered)'.format(discarded_transactions_count) if discarded_transactions_count > 0 else ''
+    logger.info('{} transactions parsed{}'.format(len(parsed_transactions), filtered_info))
 
-    processed_transactions = rules.apply(rules.load(), parsed_transactions)
+    processed_transactions = rules.apply(rules.load(), filtered_transactions)
     logger.info('Rules applied to {} transactions'.format(len(processed_transactions)))
 
     added, _ = database.update_account_transactions(db, account_config.id, processed_transactions)
     if added:
-        logger.info('Successfully updated account transactions database')
+        logger.info('Successfully added {new} credit card transactions to the database.'.format(added))
     else:
-        logger.info('There are no new account transactions to update'.format(len(raw_transactions)))
+        logger.info('There are no new account transactions to add'.format(len(raw_transactions)))
     return added
 
 
@@ -199,16 +205,22 @@ def update_bank_credit_card_transactions(db, bank_config, account_config, card_c
     logger.info('{} transactions fetched'.format(len(raw_transactions)))
 
     parsed_transactions = parse_credit_card_transactions(bank_module, bank_config, account_config, card_config, raw_transactions)
-    logger.info('{} transactions parsed'.format(len(parsed_transactions)))
+    filtered_transactions = list(filter(
+        lambda transaction: transaction.transaction_date >= from_date,
+        parsed_transactions
+    ))
+    discarded_transactions_count = len(parsed_transactions) - len(filtered_transactions)
+    filtered_info = ' ({} out of date range got filtered)'.format(discarded_transactions_count) if discarded_transactions_count > 0 else ''
+    logger.info('{} transactions parsed{}'.format(len(parsed_transactions), filtered_info))
 
-    processed_transactions = rules.apply(rules.load(), parsed_transactions)
+    processed_transactions = rules.apply(rules.load(), filtered_transactions)
     logger.info('Rules applied to {} transactions'.format(len(processed_transactions)))
 
     added, _ = database.update_credit_card_transactions(db, card_config.number, processed_transactions)
     if added:
-        logger.info('Successfully updated credit card transactions database')
+        logger.info('Successfully added {new} credit card transactions to the database.'.format(added))
     else:
-        logger.info('There are no new card transactions to update'.format(len(raw_transactions)))
+        logger.info('There are no new card transactions to add'.format(len(raw_transactions)))
     return added
 
 
@@ -235,13 +247,13 @@ def update_all(banking_config, env):
                 last_transaction_date = database.last_account_transaction_date(db, account.id)
                 if last_transaction_date is None:
                     # Query from beginning of previous year
-                    from_date = (datetime.now() + relativedelta(month=1, day=1, years=-1)).date()
+                    from_date = datetime.now() + relativedelta(month=1, day=1, years=-1, minute=0, hour=0, second=0, microsecond=0)
                 else:
                     # Query from beginning of previous day
-                    from_date = (last_transaction_date - relativedelta(days=1)).date()
+                    from_date = last_transaction_date - relativedelta(days=1, minute=0, hour=0, second=0, microsecond=0)
 
-                # Query until current day
-                to_date = datetime.now().date()
+                # Query until current day and hour
+                to_date = datetime.now()
                 added = update_bank_account_transactions(db, bank, account, from_date, to_date)
 
                 if added:
@@ -266,13 +278,14 @@ def update_all(banking_config, env):
                 last_transaction_date = database.last_credit_card_transaction_date(db, card.number)
                 if last_transaction_date is None:
                     # Query from beginning of current year
-                    from_date = (datetime.now() + relativedelta(datetime.now(), day=1, month=1)).date()
+                    from_date = datetime.now() + relativedelta(month=1, day=1, years=-1, minute=0, hour=0, second=0, microsecond=0)
                 else:
                     # Query from beginning of previous day
-                    from_date = (last_transaction_date - relativedelta(days=1)).date()
+                    from_date = last_transaction_date - relativedelta(days=1, minute=0, hour=0, second=0, microsecond=0)
 
                 # Query until current day
-                to_date = datetime.now().date()
+                to_date = datetime.now()
+
                 card_account = banking_config.accounts[card.account_number]
                 card_bank = banking_config.banks[card_account.bank_id]
                 added = update_bank_credit_card_transactions(db, card_bank, card_account, card, from_date, to_date)
@@ -284,13 +297,13 @@ def update_all(banking_config, env):
                         added=added
                     ))
             except database.DatabaseError as exc:
-                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=account.id, message=str(exc)))
+                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=card.number, message=str(exc)))
                 logger.error(str(exc))
             except Exception as exc:
-                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=account.id, traceback=traceback.format_exc()))
+                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=card.number, traceback=traceback.format_exc()))
                 logger.error(str(exc))
             except (exceptions.SomethingChangedError, exceptions.InteractionError) as exc:
-                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
+                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=card.number, message=str(exc)))
                 logger.error(exc.message)
 
     notifier = get_notifier(banking_config.notifications)

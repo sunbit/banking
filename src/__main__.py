@@ -3,6 +3,7 @@ Banking
 
 Usage:
   banking get <bank> (account|card) transactions [options]
+  banking update <bank> (account|card) transactions [options]
   banking load <bank> (account|card) transactions [options]
   banking load all transactions [--filter=<filters>]
   banking apply rules
@@ -156,11 +157,10 @@ def parse_date(date_string):
     """
         Dates from cli are expected as yyyy-mm-dd
     """
-    try:
-        year, month, day = map(int, date_string.split('-'))
-    except:
-        print('Wrong date, format should be yyyy-mm-dd')
-        sys.exit(1)
+    if not date_string:
+        return None
+
+    year, month, day = map(int, date_string.split('-'))
 
     return datetime(year, month, day)
 
@@ -169,7 +169,8 @@ if __name__ == '__main__':
     arguments = docopt(__doc__, version='Banking 1.0')
     banking_configuration = bank.load_config(bank.env()['main_config_file'])
 
-    action = list(filter(lambda action: arguments[action] is True, ['get', 'load', 'apply', 'run']))[0]
+    action = list(filter(lambda action: arguments[action] is True, ['get', 'load', 'apply', 'update', 'run']))[0]
+    target = list(filter(lambda target: arguments[target] is True, ['account', 'card', 'server']))[0]
 
     load_raw = arguments['raw']
     load_all = arguments['all']
@@ -213,14 +214,23 @@ if __name__ == '__main__':
     headless = not arguments['--debug-browser']
     close_browser = not arguments['--keep-browser-open']
 
-    if arguments['get']:
-        from_date = parse_date(arguments['--from'])
-        to_date = parse_date(arguments['--to'])
+    if action in ['get', 'update']:
+        try:
+            from_date = parse_date(arguments['--from'])
+            if from_date is None:
+                print('From date is required')
+                sys.exit(1)
+        except:
+            print('From date format error, should be yyyy-mm-dd')
+            sys.exit(1)
 
-    if arguments['account'] is True:
-        source = 'account'
-    elif arguments['card'] is True:
-        source = 'card'
+        try:
+            to_date = parse_date(arguments['--to'])
+            if to_date is None:
+                to_date = datetime.now()
+        except:
+            print('To date format error, should be yyyy-mm-dd')
+            sys.exit(1)
 
     bank_config = banking_configuration.banks[bank_id]
     bank_module = bank.load_module(bank_id)
@@ -234,12 +244,27 @@ if __name__ == '__main__':
         account_config.cards.values()
     ))[0]
 
-    if action == 'get':
+    try:
 
+        if action == 'update' and target == 'account':
+            db = database.load(bank.env()['database_folder'])
+            bank.update_bank_account_transactions(db, bank_config, account_config, from_date, to_date)
+            sys.exit(0)
+
+        if action == 'update' and target == 'card':
+            db = database.load(bank.env()['database_folder'])
+            bank.update_bank_credit_card_transactions(db, bank_config, account_config, credit_card_config, from_date, datetime.now())
+            sys.exit(0)
+
+    except database.DatabaseError as exc:
+        print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
+        sys.exit(1)
+
+    if action == 'get':
         cache_filename = '.cache/{bank}_{source}_{id}_{from_date}_{to_date}.json'.format(
             bank=bank_config.id,
-            source=source,
-            id=account_config.id if source == 'account' else credit_card_config.number,
+            source=target,
+            id=account_config.id if target == 'account' else credit_card_config.number,
             from_date=arguments['--from'],
             to_date=arguments['--to']
         )
@@ -252,7 +277,7 @@ if __name__ == '__main__':
                 browser = scrapper.new('./chromedriver', headless=headless)
                 bank_module.login(browser, bank_config.username, bank_config.password)
 
-                if source == 'account':
+                if target == 'account':
                     raw_transactions = bank_module.get_account_transactions(
                         browser,
                         account_config.id,
@@ -260,7 +285,7 @@ if __name__ == '__main__':
                         to_date
                     )
 
-                elif source == 'card':
+                elif target == 'card':
                     raw_transactions = bank_module.get_credit_card_transactions(
                         browser,
                         credit_card_config.number,
@@ -295,7 +320,7 @@ if __name__ == '__main__':
                 json.dump(raw_transactions, export_file, indent=4)
 
         if arguments['--update']:
-            if source == 'account':
+            if target == 'account':
                 try:
                     added = bank.update_bank_account_transactions(database.load(bank.env()['database_folder']), bank_config, account_config, from_date, to_date)
                 except database.DatabaseError as exc:
@@ -306,7 +331,7 @@ if __name__ == '__main__':
                     account=account_config,
                     added=added
                 ))
-            if source == 'card':
+            if target == 'card':
                 try:
                     added = bank.update_bank_credit_card_transactions(database.load(bank.env()['database_folder']), bank_config, account_config, credit_card_config, from_date, to_date)
                 except database.DatabaseError as exc:
@@ -318,13 +343,26 @@ if __name__ == '__main__':
                     added=added
                 ))
 
+    if action == 'load' and not load_raw:
+        db = database.load(bank.env()['database_folder'])
+
+        if target == 'account':
+            transactions = database.io.find_account_transactions(db, account_number=account_config.id)
+        elif target == 'card':
+            transactions = database.io.find_credit_card_transactions(db, credit_card_number=credit_card_config.number)
+
+        filters_argument = arguments['--filter'] if arguments['--filter'] is not None else ''
+        parsed_filters = list(map(lambda f: f.lower(), filters_argument.split(',')))
+        print(table_all(transactions, filters=parsed_filters))
+        sys.exit(0)
+
     if action == 'load' and load_raw:
         raw_transactions = json.load(open(arguments['<raw-filename>']))
 
-        if source == 'account':
+        if target == 'account':
             parsed_transactions = bank.parse_account_transactions(bank_module, bank_config, account_config, raw_transactions)
 
-        elif source == 'card':
+        elif target == 'card':
             parsed_transactions = bank.parse_credit_card_transactions(bank_module, bank_config, account_config, credit_card_config, raw_transactions)
 
         processed_transactions = rules.apply(rules.load(), parsed_transactions)
@@ -341,4 +379,4 @@ if __name__ == '__main__':
         if at_least_one:
             print('-' * 80)
 
-        print(table(processed_transactions, show_balance=source == 'account'))
+        print(table(processed_transactions, show_balance=target == 'account'))

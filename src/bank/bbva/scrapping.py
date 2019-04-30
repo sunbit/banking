@@ -6,20 +6,17 @@ import json
 import time
 
 
-FIX_NULL_DATE = """
+FIX_NULL_DATE_ACCOUNT = """
 try {{
   arg = JSON.parse(arguments[0]);
   if (arg.hasOwnProperty('filter')) {{
-    if (arg.filter.dates.from === null || arg.filter.dates.to === null) {{
-        arg.filter.dates.from = '{from_date}T01:00:00.000Z'
-        arg.filter.dates.to = '{to_date}T01:00:00.000Z'
+        arg.filter.dates.from = '{from_date}'
+        arg.filter.dates.to = '{to_date}'
         arguments[0] = JSON.stringify(arg)
 
         document.createElement('div');
         fixed.id = 'fixed_date';
         document.body.appendChild(fixed);
-
-    }}
   }}
 }}
 catch (e) {{
@@ -27,6 +24,23 @@ catch (e) {{
 }}
 """
 
+FIX_NULL_DATE_CREDIT_CARD = """
+try {{
+  arg = JSON.parse(arguments[0]);
+  if (arg.hasOwnProperty('searchFilters')) {{
+        arg.searchFilters.transactionDate.from = '{from_date}'
+        arg.searchFilters.transactionDate.to = '{to_date}'
+        arguments[0] = JSON.stringify(arg)
+
+        document.createElement('div');
+        fixed.id = 'fixed_date';
+        document.body.appendChild(fixed);
+  }}
+}}
+catch (e) {{
+    console.log('PASS')
+}}
+"""
 
 logger = get_logger(name='scrapper')
 
@@ -75,12 +89,14 @@ def get_account_transactions(browser, account_number, from_date, to_date):
 
     time.sleep(2)  # To try to avoid the null values in the date filter request
     log('Setting up XHR request interceptor')
+
     script = xhr_intercept_response(
         match_url="accountTransactionsAdvancedSearch",
         output="interceptedResponse",
-        request_intercept_script=FIX_NULL_DATE.format(
-            from_date='-'.join(reversed(encode_date(from_date).split('/'))),
-            to_date='-'.join(reversed(encode_date(to_date).split('/')))
+        # This will modify the date in the request so the full hour is set and we get all transactions
+        request_intercept_script=FIX_NULL_DATE_ACCOUNT.format(
+            from_date=from_date.strftime('%Y-%m-%dT00:00:00Z'),
+            to_date=to_date.strftime('%Y-%m-%dT%H:%M:%SZ')
         )
     )
     browser.driver.execute_script(script)
@@ -115,7 +131,6 @@ def get_account_transactions(browser, account_number, from_date, to_date):
 
     # Results come from newer to older, we want it the other way around, that why we reverse them
     results = list(reversed(list((chain.from_iterable([response['accountTransactions'] for response in intercepted_responses if response is not None])))))
-    log('Found {} transactions'.format(len(results)))
     return results
 
 
@@ -139,6 +154,10 @@ def get_credit_card_transactions(browser, card_number, from_date, to_date):
     script = xhr_intercept_response(
         match_url="listIntegratedCardTransactions",
         output="interceptedResponse",
+        request_intercept_script=FIX_NULL_DATE_CREDIT_CARD.format(
+            from_date=from_date.strftime('%Y-%m-%dT00:00:00Z'),
+            to_date=to_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+        )
     )
     browser.driver.execute_script(script)
 
@@ -168,5 +187,4 @@ def get_credit_card_transactions(browser, card_number, from_date, to_date):
 
     # Results come from newer to older, we want it the other way around, that why we reverse them
     results = list(reversed(list(chain.from_iterable([response['cardsTransactions'] for response in intercepted_responses if response is not None]))))
-    log('Found {} transactions'.format(len(results)))
     return results

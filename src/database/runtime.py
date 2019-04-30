@@ -1,6 +1,5 @@
+from functools import partial
 from tinymongo import TinyMongoClient
-
-import re
 
 from . import io
 from datatypes import BankAccountTransaction, BankCreditCardTransaction
@@ -44,13 +43,19 @@ def update_account_transactions(db, account_number, fetched_transactions):
         fetched_transactions
     )
 
+    actions = {
+        'insert': [],
+        'update': []
+    }
+
     for action, transaction in io.select_new_transactions(converted_transactions, existing_transactions, mode='account'):
-        if action == 'insert':
-            io.insert_account_transaction(db, transaction)
-            added += 1
-        elif action == 'update':
-            io.update_account_transaction(db, transaction)
-            updated += 1
+        actions[action].append(transaction)
+
+    # If any error raised due to selecting transactions, no action will be still executed
+    # we do it now
+
+    inserted = list(map(partial(io.insert_account_transaction, db), actions['insert']))
+    updated = list(map(partial(io.update_account_transaction, db), actions['update']))
 
     inconsistent_transaction = io.check_balance_consistency(db, account_number)
 
@@ -60,7 +65,7 @@ def update_account_transactions(db, account_number, fetched_transactions):
                 transaction=inconsistent_transaction)
         )
 
-    return (added, updated)
+    return (len(inserted), len(updated))
 
 
 def update_credit_card_transactions(db, credit_card_number, fetched_transactions):
@@ -75,23 +80,25 @@ def update_credit_card_transactions(db, credit_card_number, fetched_transactions
     else:
         existing_transactions = io.find_credit_card_transactions(db, credit_card_number, since_date=fetched_transactions[0].transaction_date)
 
-    added = 0
-    updated = 0
-
     converted_transactions = map(
         lambda transaction: BankCreditCardTransaction(**transaction.__dict__),
         fetched_transactions
     )
 
+    actions = {
+        'insert': [],
+        'update': []
+    }
     for action, transaction in io.select_new_transactions(converted_transactions, existing_transactions, mode='credit_card'):
-        if action == 'insert':
-            io.insert_credit_card_transaction(db, transaction)
-            added += 1
-        elif action == 'update':
-            io.update_credit_card_transaction(db, transaction)
-            updated += 1
+        actions[action].append(transaction)
 
-    return (added, updated)
+    # If any error raised due to selecting transactions, no action will be still executed
+    # we do it now
+
+    inserted = list(map(partial(io.insert_credit_card_transaction, db), actions['insert']))
+    updated = list(map(partial(io.update_credit_card_transaction, db), actions['update']))
+
+    return (len(inserted), len(updated))
 
 
 def update_transaction(db, transaction):

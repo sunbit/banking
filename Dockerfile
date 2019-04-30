@@ -15,7 +15,7 @@ RUN mkdir /app
 WORKDIR /app
 
 # Install chromedriver for Selenium
-RUN curl https://chromedriver.storage.googleapis.com/73.0.3683.68/chromedriver_linux64.zip | gunzip > chromedriver
+RUN curl https://chromedriver.storage.googleapis.com/74.0.3729.6/chromedriver_linux64.zip | gunzip > chromedriver
 RUN chmod +x /app/chromedriver
 
 COPY Pipfile /app/Pipfile

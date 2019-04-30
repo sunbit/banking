@@ -352,7 +352,16 @@ def select_new_transactions(fetched_transactions, db_transactions, mode):
         elif action == '-' and not all_fetched_processed:
             # This will never happen, as the last conditional in the loop breaks it
             # the as soon as all fetched items are processed
-            raise DatabaseError('Transaction history has diverged')
+            diverged_transaction = db_transactions_by_hash[transaction_hash]
+            raise DatabaseError(
+                'Transaction history has diverged on {transaction_date}, "{type} {amount} {source} --> {destination}"'.format(
+                    transaction_date=diverged_transaction.transaction_date.strftime('%Y/%m/%d'),
+                    type=diverged_transaction.type.value,
+                    amount=diverged_transaction.amount,
+                    source=getattr(diverged_transaction.source, 'name', 'Unknown'),
+                    destination=getattr(diverged_transaction.destination, 'name', 'Unknown')
+                )
+            )
 
         # After processing the last fetched transaction, if we didn't do
         # anything that broke the sequence numbering, we can stop

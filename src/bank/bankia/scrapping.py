@@ -116,7 +116,6 @@ def get_account_transactions(browser, account_number, from_date, to_date):
 
     # Results come from newer to older, we want it the other way around, that why we reverse them
     results = list(reversed(list(chain.from_iterable([response['movimientos'] for response in intercepted_responses if response is not None]))))
-    log('Found {} transactions'.format(len(results)))
     return results
 
 
@@ -187,5 +186,4 @@ def get_credit_card_transactions(browser, card_number, from_date, to_date):
 
     # results already sorted from older to newer, no need to reverse them
     results = list(chain.from_iterable([response['movimientosTarjeta'] for response in intercepted_responses if response is not None]))
-    log('Found {} transactions'.format(len(results)))
     return results
