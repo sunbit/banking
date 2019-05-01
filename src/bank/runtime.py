@@ -292,21 +292,21 @@ def update_all(banking_config, env):
 
                 if added:
                     success.append('Added {added} new transactions for *{bank.name}* card *{card.number}*'.format(
-                        bank=bank,
+                        bank=card_bank,
                         card=card,
                         added=added
                     ))
             except database.DatabaseError as exc:
-                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=card.number, message=str(exc)))
+                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))
                 logger.error(str(exc))
             except Exception as exc:
-                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=card.number, traceback=traceback.format_exc()))
+                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, traceback=traceback.format_exc()))
                 logger.error(str(exc))
             except (exceptions.SomethingChangedError, exceptions.InteractionError) as exc:
-                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=card.number, message=str(exc)))
+                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))
                 logger.error(exc.message)
             except (exceptions.ParsingError) as exc:
-                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=card.number, message=str(exc)))
+                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))
                 logger.error(exc.message)
 
     notifier = get_notifier(banking_config.notifications)
