@@ -185,7 +185,7 @@ def update_bank_account_transactions(db, bank_config, account_config, from_date,
 
     added, _ = database.update_account_transactions(db, account_config.id, processed_transactions)
     if added:
-        logger.info('Successfully added {new} credit card transactions to the database.'.format(added))
+        logger.info('Successfully added {} credit card transactions to the database.'.format(added))
     else:
         logger.info('There are no new account transactions to add'.format(len(raw_transactions)))
     return added
@@ -218,7 +218,7 @@ def update_bank_credit_card_transactions(db, bank_config, account_config, card_c
 
     added, _ = database.update_credit_card_transactions(db, card_config.number, processed_transactions)
     if added:
-        logger.info('Successfully added {new} credit card transactions to the database.'.format(added))
+        logger.info('Successfully added {} credit card transactions to the database.'.format(added))
     else:
         logger.info('There are no new card transactions to add'.format(len(raw_transactions)))
     return added
@@ -303,6 +303,9 @@ def update_all(banking_config, env):
                 failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=card.number, traceback=traceback.format_exc()))
                 logger.error(str(exc))
             except (exceptions.SomethingChangedError, exceptions.InteractionError) as exc:
+                failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=card.number, message=str(exc)))
+                logger.error(exc.message)
+            except (exceptions.ParsingError) as exc:
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='card', id=card.number, message=str(exc)))
                 logger.error(exc.message)
 

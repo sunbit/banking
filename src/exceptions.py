@@ -16,3 +16,7 @@ class InteractionError(Exception):
 
     {suggestion}
 """.format(action=action, element=element, suggestion=suggestion)
+
+
+class ParsingError(Exception):
+    pass

@@ -4,9 +4,10 @@ from itertools import chain
 import re
 
 from datatypes import TransactionType, TransactionDirection, ParsedBankAccountTransaction, ParsedCreditCardTransaction
-from datatypes import Account, Bank, Card, ModifiedFlags, UnknownSubject, UnknownWallet
+from datatypes import Account, Bank, Card, UnknownSubject, UnknownWallet
 from common.parsing import extract_literals, extract_keywords
 from common.utils import get_nested_item
+from exceptions import ParsingError
 
 
 import datatypes
@@ -352,7 +353,7 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
     del details['account']
 
     return ParsedCreditCardTransaction(
-        transaction_id=transaction['identificadorMovimiento'],
+        transaction_id=None,
         currency=transaction['importeMovimiento']['nombreMoneda'],
         amount=amount,
         value_date=decode_date(transaction['fechaMovimiento']['valor'], transaction['horaMovimiento']['valor']),

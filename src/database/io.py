@@ -245,7 +245,6 @@ def check_balance_consistency(db, account_number):
         # Fucking python floating point precission shit ...
         is_consistent = round(last_balance + transaction.amount, 2) == transaction.balance
         if not is_consistent:
-            import ipdb;ipdb.set_trace()
             return transaction
         last_balance = transaction.balance
 
@@ -258,7 +257,7 @@ def select_new_transactions(fetched_transactions, db_transactions, mode):
         if mode == 'account':
             fields = '{m.transaction_date} {m.amount} {m.balance}'
         elif mode == 'credit_card':
-            fields = '{m.transaction_date} {m.amount} {m.transaction_id}'
+            fields = '{m.transaction_date} {m.amount} {m.type.name}'
 
         return fields.format(m=transaction).encode('utf-8')
 

@@ -4,7 +4,7 @@ from datetime import datetime
 import re
 
 from datatypes import TransactionType, TransactionDirection, ParsedBankAccountTransaction, ParsedCreditCardTransaction
-from datatypes import Account, Bank, Card, ModifiedFlags, UnknownSubject, UnknownWallet
+from datatypes import Account, Bank, Card, UnknownSubject, UnknownWallet
 from common.parsing import extract_literals, extract_keywords
 from common.utils import get_nested_item
 
