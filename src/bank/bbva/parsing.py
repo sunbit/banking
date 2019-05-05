@@ -46,16 +46,16 @@ def get_type(transaction_code, transation_direction):
     """
 
     PAYCHECK = ['0114']
-    PURCHASE = ['0017', '00400']
+    PURCHASE = ['0017', '00400', '0005']
     TRANSFER = ['0149', '0064']
     WITHDRAWAL = ['0022', '00200']
     DOMICILED_RECEIPT = ['0058']
-    CREDIT_CARD_INVOICE = ['0060']
+    CREDIT_CARD_INVOICE = ['0060', '0070']
 
     if transaction_code in PURCHASE:
         return {
             TransactionDirection.CHARGE: TransactionType.PURCHASE,
-            TransactionDirection.INCOME: None
+            TransactionDirection.INCOME: TransactionType.PURCHASE_RETURN
         }.get(transation_direction)
 
     if transaction_code in TRANSFER:
@@ -85,7 +85,7 @@ def get_type(transaction_code, transation_direction):
     if transaction_code in CREDIT_CARD_INVOICE:
         return {
             TransactionDirection.CHARGE: TransactionType.CREDIT_CARD_INVOICE,
-            TransactionDirection.INCOME: None
+            TransactionDirection.INCOME: TransactionType.CREDIT_CARD_INVOICE_PAYMENT
         }.get(transation_direction)
 
 
@@ -311,11 +311,15 @@ def parse_account_transaction(bank_config, account_config, transaction):
 
 def parse_credit_card_transaction(bank_config, account_config, card_config, transaction):
     amount = transaction['amount']['amount']
-    # Until we don't have more information, we assume everything card related is
-    # a purchase, forcing the code
-    transaction_code = "0017"
+    transaction_code = get_nested_item(transaction, 'concept.id')
+    if transaction_code == '0000':
+        # code 0000 seems like an error, as it's really a regular purcharse,
+        # so we fake the code
+        transaction_code = '0005'
+
     transation_direction = TransactionDirection.CHARGE if amount < 0 else TransactionDirection.INCOME
     transaction_type = get_type(transaction_code, transation_direction)
+
 
     details = get_card_transaction_details(transaction, transaction_type)
     details['account'] = Account.from_config(account_config)
