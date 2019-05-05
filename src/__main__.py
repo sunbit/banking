@@ -170,7 +170,7 @@ if __name__ == '__main__':
     banking_configuration = bank.load_config(bank.env()['main_config_file'])
 
     action = list(filter(lambda action: arguments[action] is True, ['get', 'load', 'apply', 'update', 'run']))[0]
-    target = list(filter(lambda target: arguments[target] is True, ['account', 'card', 'server']))[0]
+    target = list(filter(lambda target: arguments[target] is True, ['account', 'card', 'server', 'all']))[0]
 
     load_raw = arguments['raw']
     load_all = arguments['all']
