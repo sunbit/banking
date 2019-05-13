@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_cors import CORS
 from flask_restful import Api as RestApi
 
 
@@ -11,8 +12,10 @@ def run(banking_config):
 
     app = Flask('banking')
     rest_api = RestApi(app)
+    CORS(app)
 
-    rest_api.add_resource(api.TodoList, '/todos')
-    rest_api.add_resource(api.Todo, '/todos/<todo_id>')
+    rest_api.add_resource(api.AccountsList, '/accounts')
+    rest_api.add_resource(api.Account, '/accounts/<account_id>')
+    rest_api.add_resource(api.AccountTransactions, '/accounts/<account_id>/transactions')
 
     app.run(debug=False, host='0.0.0.0')

@@ -2,7 +2,8 @@ from functools import partial
 from tinymongo import TinyMongoClient
 
 from . import io
-from datatypes import BankAccountTransaction, BankCreditCardTransaction
+from datatypes import BankAccountTransaction, BankCreditCardTransaction, LocalAccountTransaction
+from datatypes import LocalAccount
 
 
 def load(database_folder):
@@ -21,6 +22,22 @@ def last_credit_card_transaction_date(db, credit_card_number):
     collection = db.credit_card_transactions
     results = io.find_credit_card_transactions(collection, credit_card_number)
     return results[-1].transaction_date if results else None
+
+
+def find_transactions(db, account, **query):
+    if isinstance(account, LocalAccount):
+        return io.find_local_account_transactions(db, account_id=account.id, **query)
+
+
+def get_account_balance(db, account):
+    if isinstance(account, LocalAccount):
+        results = io.find_local_account_transactions(db, account.id)
+        return results[-1].balance if results else 0
+
+
+def insert_transaction(db, transaction):
+    if isinstance(transaction.account, LocalAccount):
+        return io.insert_local_account_transaction(db, transaction)
 
 
 def update_account_transactions(db, account_number, fetched_transactions):

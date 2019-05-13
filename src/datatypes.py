@@ -265,6 +265,7 @@ class BankAccountTransaction():
     flags: ModifiedFlags = field(default_factory=ModifiedFlags)
     subtransactions: list = field(default_factory=list)
     related: RelatedTransaction = None
+    offset: RelatedTransaction = None
     _id: str = None
     _seq: int = None
 
@@ -274,11 +275,11 @@ class LocalAccountTransaction():
     currency: str
     amount: float
     balance: float
-    value_date: str
     transaction_date: str
     source: TransactionSubject
     destination: TransactionSubject
     account: LocalAccount
+    card: Card
     keywords: list
     comment: str
     category: Category = None
@@ -286,6 +287,7 @@ class LocalAccountTransaction():
     flags: ModifiedFlags = field(default_factory=ModifiedFlags)
     subtransactions: list = field(default_factory=list)
     related: RelatedTransaction = None
+    offset: RelatedTransaction = None
     _id: str = None
     _seq: int = None
 

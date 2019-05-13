@@ -11,13 +11,15 @@ import re
 
 import datatypes
 
+from .domain import SortDirection
+
 
 class DatabaseError(Exception):
     pass
 
 
 def encode_date(dt):
-    return dt.strftime('%Y/%m/%dT%H:%M:%S')
+    return dt.strftime('%Y-%m-%dT%H:%M:%S')
 
 
 def encode_transaction(parsed_transaction):
@@ -79,7 +81,7 @@ def decode_transaction(document):
             CustomEnum = getattr(datatypes, custom_type_name)
             return CustomEnum[obj['name']]
         elif custom_type_class == 'datetime':
-            return datetime.strptime(obj['date'], '%Y/%m/%dT%H:%M:%S')
+            return datetime.strptime(obj['date'], '%Y-%m-%dT%H:%M:%S')
         else:
             return obj
 
@@ -106,6 +108,32 @@ def decode_transaction(document):
 
     decoded = recurse(deepcopy(document))
     return decoded
+
+
+def find_local_account_transactions(db, account_id=None, since_date=None, sort_direction=SortDirection.NEWEST_TRANSACTION_LAST):
+    collection = db.local_account_transactions
+    query = {}
+
+    if account_id is not None:
+        query['account.id'] = account_id
+
+    if since_date is not None:
+        query['transaction_date.date'] = {'$gte': encode_date(since_date)}
+
+    results = list(map(
+        decode_transaction,
+        collection.find(
+            query,
+            sort=[('_seq', sort_direction.value)]
+        )
+    ))
+
+    return results
+
+
+def insert_local_account_transaction(db, transaction):
+    collection = db.local_account_transactions
+    return collection.insert_one(encode_transaction(transaction))
 
 
 def find_matching_account_transaction(db, account_number, transaction):
@@ -349,8 +377,8 @@ def select_new_transactions(fetched_transactions, db_transactions, mode):
             pass
 
         elif action == '-' and not all_fetched_processed:
-            # This will never happen, as the last conditional in the loop breaks it
-            # the as soon as all fetched items are processed
+            import ipdb;ipdb.set_trace()
+
             diverged_transaction = db_transactions_by_hash[transaction_hash]
             raise DatabaseError(
                 'Transaction history has diverged on {transaction_date}, "{type} {amount} {source} --> {destination}"'.format(
