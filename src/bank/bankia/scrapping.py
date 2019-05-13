@@ -23,7 +23,10 @@ def encode_date(dt):
 def login(browser, username, password):
     log('Loading BANKIA main page')
     browser.get('https://www.bankia.es')
-    browser.driver.find_element_by_css_selector('a#CybotCookiebotDialogBodyButtonAccept').click()
+    try:
+        browser.driver.find_element_by_css_selector('a#CybotCookiebotDialogBodyButtonAccept').click()
+    except:
+        log('Timeout trying to click on cookie accept button, continuing anyway')
 
     log('Opening login form')
     browser.find_element_by_css_selector('a.fc-openLogin').click()
