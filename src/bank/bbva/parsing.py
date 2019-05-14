@@ -48,7 +48,7 @@ def get_type(transaction_code, transation_direction):
     PAYCHECK = ['0114']
     PURCHASE = ['0017', '00400', '0005']
     TRANSFER = ['0149', '0064']
-    WITHDRAWAL = ['0022', '00200']
+    WITHDRAWAL = ['0022', '00200', '0007']
     DOMICILED_RECEIPT = ['0058']
     CREDIT_CARD_INVOICE = ['0060', '0070']
 
@@ -320,7 +320,6 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
     transation_direction = TransactionDirection.CHARGE if amount < 0 else TransactionDirection.INCOME
     transaction_type = get_type(transaction_code, transation_direction)
 
-
     details = get_card_transaction_details(transaction, transaction_type)
     details['account'] = Account.from_config(account_config)
     details['bank'] = Bank.from_config(bank_config)
@@ -342,6 +341,29 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
     destination = get_destination(details, transaction_type)
     del details['bank']
     del details['account']
+
+    is_debit_operation = transaction.get('operationTypeIndicator') == 'D'
+    is_consolidated = transaction.get('status', {}).get('id') == '7'
+
+    if is_debit_operation:
+        from common.notifications import get_notifier
+        import bank
+        banking_configuration = bank.load_config(bank.env()['main_config_file'])
+        notifier = get_notifier(banking_configuration.notifications)
+        notifier('Debit transaction found, not adding {bank.name} card transaction: {date} {amount}, {source}->{destination}'.format(
+            bank=bank_config, amount=amount, date=transaction['valueDate'], source=str(source), destination=str(destination))
+        )
+        return None
+
+    if not is_consolidated:
+        from common.notifications import get_notifier
+        import bank
+        banking_configuration = bank.load_config(bank.env()['main_config_file'])
+        notifier = get_notifier(banking_configuration.notifications)
+        notifier('Non consolidated transaction found, not adding {bank.name} card transaction: {date} {amount}, {source}->{destination}'.format(
+            bank=bank_config, amount=amount, date=transaction['valueDate'], source=str(source), destination=str(destination))
+        )
+        return None
 
     return ParsedCreditCardTransaction(
         transaction_id=transaction['id'],
