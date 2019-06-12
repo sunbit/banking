@@ -5,6 +5,7 @@ import re
 import time
 
 from common.logging import get_logger
+from exceptions import ScrappingError
 from scrapper.scripts import xhr_intercept_response
 from scrapper.driver import forced_click
 
@@ -91,6 +92,7 @@ def get_account_transactions(browser, account_number, from_date, to_date):
 
     # Iterate trough all the infinite scrolling pagination
     while still_have_results:
+        t0 = time.time()
         while intercepted_responses_count == len(intercepted_responses):
             # Inner Loop to wait for the page to load and push the new transactions
 
@@ -102,6 +104,9 @@ def get_account_transactions(browser, account_number, from_date, to_date):
             time.sleep(0.1)
 
             still_have_results = False if intercepted_responses[-1] is None else intercepted_responses[-1]['indicadorMasRegistros']
+            t1 = time.time()
+            if t1 - t0 > 20:
+                raise ScrappingError('bankia account', account_number, 'Timeout while waiting to load more results')
 
         intercepted_responses_count = len(intercepted_responses)
 

@@ -6,6 +6,10 @@ from json import JSONEncoder, JSONDecoder
 import datatypes
 
 
+def parse_bool(value):
+    return str(value).upper() in ('1', 'TRUE')
+
+
 def get_nested_item(dictionary, xpath, default=None):
 
     def getitem(d, key):

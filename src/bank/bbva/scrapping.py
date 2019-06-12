@@ -80,7 +80,7 @@ def get_account_transactions(browser, account_number, from_date, to_date):
     browser.find_elements_by_css_selector('p[role=link').filter(lambda element: account_number in element.text)[0].forced_click()
 
     log('Loading account advanced search')
-    browser.find_element_by_css_selector('ul.menuPestanas span.consultas').click()
+    browser.find_element_by_css_selector('ul.menuPestanas span.consultas').forced_click()
     browser.find_element_by_css_selector('.busquedaAvanzada[role=button]', visible=True).click()
 
     log('Filling date query parameters')
@@ -142,8 +142,8 @@ def get_credit_card_transactions(browser, card_number, from_date, to_date):
     browser.find_element_by_xpath('//p[@role="link"][contains(text(), "{}")]'.format(card_number)).forced_click()
 
     log('Open advanced search')
-    browser.find_element_by_xpath('//span[contains(@class, "consulta")]').click()
-    browser.find_element_by_css_selector('p.busquedaAvanzada[role="button"]', visible=True).click()
+    browser.find_element_by_xpath('//span[contains(@class, "consulta")]').forced_click()
+    browser.find_element_by_css_selector('p.busquedaAvanzada[role="button"]', visible=True).forced_click()
 
     log('Filling date query parameters')
     browser.find_element_by_css_selector('input#fechaDesde').focus().clear().send_keys(encode_date(from_date))
@@ -162,6 +162,7 @@ def get_credit_card_transactions(browser, card_number, from_date, to_date):
     browser.driver.execute_script(script)
 
     log('Launching the initial search')
+    time.sleep(2)
     browser.find_element_by_xpath('//*[@role="link"][contains(text(), "Buscar")]').focus().click()
 
     intercepted_responses = []

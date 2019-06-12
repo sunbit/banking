@@ -10,6 +10,7 @@ from functools import partial, wraps
 import time
 
 from exceptions import InteractionError, SomethingChangedError
+import bank
 
 
 def catch_selenium_exceptions(original_function):
@@ -25,7 +26,7 @@ def catch_selenium_exceptions(original_function):
                 raise InteractionError(
                     action=original_function.__name__,
                     element=element_html(original_function),
-                    suggestion="There's another element visualy over it. It may be a scroll problem or a popup. You can try forcing the click wiht .forced_click()")
+                    suggestion="There's another element visualy over it. It may be a scroll problem or a popup. You can try forcing the click with .forced_click()")
             else:
                 raise(exc)
         except ElementNotVisibleException:
@@ -133,8 +134,7 @@ def wrapped_result(_result):
 
 
 def new(*args, **kwargs):
-
-    headless = kwargs.pop('headless', False)
+    headless = kwargs.pop('headless', True)
 
     chrome_options = Options()
     chrome_options.add_argument("--window-size=1920x800")

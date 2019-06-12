@@ -11,6 +11,7 @@ from .io import decode_bank, decode_card, decode_account, decode_local_account, 
 from datatypes import Configuration, Category
 from common.logging import get_logger
 from common.notifications import get_notifier
+from common.utils import parse_bool
 
 
 import scrapper
@@ -26,6 +27,8 @@ def env():
         'database_folder': os.getenv('BANKING_DATABASE_FOLDER', './database'),
         'main_config_file': os.getenv('BANKING_CONFIG_FILE', './banking.yaml'),
         'categories_file': os.getenv('BANKING_CATEGORIES_FILE', './categories.yaml'),
+        'headless_browser': parse_bool(os.getenv('BANKING_HEADLESS_BROWSER', True)),
+
     }
 
 
@@ -131,7 +134,7 @@ def parse_credit_card_transactions(bank_module, bank_config, account_config, cre
 
 
 def scrap_bank_account_transactions(bank_module, bank_config, account_config, from_date, to_date):
-    browser = scrapper.new('./chromedriver', headless=True)
+    browser = scrapper.new('./chromedriver', headless=env()['headless_browser'])
     bank_module.login(browser, bank_config.username, bank_config.password)
     transactions = bank_module.get_account_transactions(
         browser,
@@ -145,7 +148,7 @@ def scrap_bank_account_transactions(bank_module, bank_config, account_config, fr
 
 
 def scrap_bank_credit_card_transactions(bank_module, bank_config, card_config, from_date, to_date):
-    browser = scrapper.new('./chromedriver', headless=True)
+    browser = scrapper.new('./chromedriver', headless=env()['headless_browser'])
     bank_module.login(browser, bank_config.username, bank_config.password)
     transactions = bank_module.get_credit_card_transactions(
         browser,
@@ -185,7 +188,7 @@ def update_bank_account_transactions(db, bank_config, account_config, from_date,
 
     added, _ = database.update_account_transactions(db, account_config.id, processed_transactions)
     if added:
-        logger.info('Successfully added {} credit card transactions to the database.'.format(added))
+        logger.info('Successfully added {} account transactions to the database.'.format(added))
     else:
         logger.info('There are no new account transactions to add'.format(len(raw_transactions)))
     return added

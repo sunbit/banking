@@ -18,5 +18,14 @@ class InteractionError(Exception):
 """.format(action=action, element=element, suggestion=suggestion)
 
 
+class ScrappingError(Exception):
+    def __init__(self, scrapper, target, message):
+        self.message = f"""
+    An error occurred while scrapping "{scrapper}" on target "{target}"
+
+    {message}
+"""
+
+
 class ParsingError(Exception):
     pass

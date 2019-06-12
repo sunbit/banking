@@ -3,19 +3,45 @@ from datetime import datetime
 from dataclasses import is_dataclass
 from difflib import Differ
 from enum import Enum
-from hashlib import sha1
 from operator import itemgetter
 from copy import deepcopy
 
 import re
 
 import datatypes
+from common.utils import get_nested_item
 
 from .domain import SortDirection
 
 
 class DatabaseError(Exception):
     pass
+
+
+class DivergedHistoryError(DatabaseError):
+    def __init__(self, diverged_transaction, extra_message=''):
+        self.transaction = diverged_transaction
+        self.message = 'Transaction history has diverged on {transaction_date}, "{type} {amount} {source} --> {destination}". {extra}'.format(
+            transaction_date=diverged_transaction.transaction_date.strftime('%Y/%m/%d'),
+            type=diverged_transaction.type.value,
+            amount=diverged_transaction.amount,
+            source=getattr(diverged_transaction.source, 'name', 'Unknown'),
+            destination=getattr(diverged_transaction.destination, 'name', 'Unknown'),
+            extra=extra_message
+        )
+
+
+def diverged_history(diverged_transaction, extra_message=''):
+    raise DatabaseError(
+        'Transaction history has diverged on {transaction_date}, "{type} {amount} {source} --> {destination}". {extra}'.format(
+            transaction_date=diverged_transaction.transaction_date.strftime('%Y/%m/%d'),
+            type=diverged_transaction.type.value,
+            amount=diverged_transaction.amount,
+            source=getattr(diverged_transaction.source, 'name', 'Unknown'),
+            destination=getattr(diverged_transaction.destination, 'name', 'Unknown'),
+            extra=extra_message
+        )
+    )
 
 
 def encode_date(dt):
@@ -157,6 +183,21 @@ def find_matching_account_transaction(db, account_number, transaction):
     return decode_transaction(results[0])
 
 
+def find_one_account_transaction(db, account_number, sort_seq=1):
+    collection = db.account_transactions
+    results = list(collection.find(
+        {
+            'account.id': account_number,
+        },
+        sort=[('_seq', sort_seq)]
+    ))
+
+    if not results:
+        return None
+
+    return decode_transaction(results[0])
+
+
 def find_account_transactions(db, account_number=None, since_seq_number=None, since_date=None):
     collection = db.account_transactions
     query = {}
@@ -186,6 +227,13 @@ def insert_account_transaction(db, transaction):
     return collection.insert_one(encode_transaction(transaction))
 
 
+def count_account_transactions(db, account_number):
+    collection = db.account_transactions
+    query = {}
+    query['account.id'] = account_number
+    return collection.find(query).count()
+
+
 def update_account_transaction(db, transaction):
     collection = db.account_transactions
     return collection.update({'_id': transaction._id}, encode_transaction(transaction))
@@ -208,6 +256,21 @@ def find_matching_credit_card_transaction(db, credit_card_number, transaction):
 
     if len(results) > 1:
         raise DatabaseError('Found more than one match for a transaction, check the algorithm')
+
+    return decode_transaction(results[0])
+
+
+def find_one_credit_card_transaction(db, credit_card_number, sort_seq=1):
+    collection = db.credit_card_transactions
+    results = list(collection.find(
+        {
+            'card.number': credit_card_number,
+        },
+        sort=[('_seq', sort_seq)]
+    ))
+
+    if not results:
+        return None
 
     return decode_transaction(results[0])
 
@@ -239,6 +302,13 @@ def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=
 def insert_credit_card_transaction(db, transaction):
     collection = db.credit_card_transactions
     return collection.insert_one(encode_transaction(transaction))
+
+
+def count_credit_card_transactions(db, credit_card_number):
+    collection = db.credit_card_transactions
+    query = {}
+    query['card.number'] = credit_card_number
+    return collection.find(query).count()
 
 
 def update_credit_card_transaction(db, transaction):
@@ -279,19 +349,19 @@ def check_balance_consistency(db, account_number):
     return None
 
 
-def select_new_transactions(fetched_transactions, db_transactions, mode):
+def select_new_transactions(fetched_transactions, db_transactions, transaction_key_fields):
 
     def transaction_string(transaction):
-        if mode == 'account':
-            fields = '{m.transaction_date} {m.amount} {m.balance}'
-        elif mode == 'credit_card':
-            fields = '{m.transaction_date} {m.amount} {m.type.name}'
-
-        return fields.format(m=transaction).encode('utf-8')
+        return ' '.join(
+            map(
+                lambda field: get_nested_item(transaction, field).__repr__(),
+                transaction_key_fields
+            )
+        )
 
     hashed_fetched_transactions = [
         (
-            sha1(transaction_string(transaction)).hexdigest(),
+            transaction_string(transaction),
             transaction,
         )
         for transaction in fetched_transactions
@@ -299,7 +369,7 @@ def select_new_transactions(fetched_transactions, db_transactions, mode):
 
     hashed_db_transactions = [
         (
-            sha1(transaction_string(transaction)).hexdigest(),
+            transaction_string(transaction),
             transaction,
         )
         for transaction in db_transactions
@@ -316,11 +386,11 @@ def select_new_transactions(fetched_transactions, db_transactions, mode):
     ))
 
     next_seq_number = 0
-
     sequence_change_needed = False
     all_fetched_processed = False
 
     # from pprint import pprint
+    # print()
     # pprint(diff)
     # print()
 
@@ -377,18 +447,7 @@ def select_new_transactions(fetched_transactions, db_transactions, mode):
             pass
 
         elif action == '-' and not all_fetched_processed:
-            import ipdb;ipdb.set_trace()
-
-            diverged_transaction = db_transactions_by_hash[transaction_hash]
-            raise DatabaseError(
-                'Transaction history has diverged on {transaction_date}, "{type} {amount} {source} --> {destination}"'.format(
-                    transaction_date=diverged_transaction.transaction_date.strftime('%Y/%m/%d'),
-                    type=diverged_transaction.type.value,
-                    amount=diverged_transaction.amount,
-                    source=getattr(diverged_transaction.source, 'name', 'Unknown'),
-                    destination=getattr(diverged_transaction.destination, 'name', 'Unknown')
-                )
-            )
+            raise DivergedHistoryError(db_transactions_by_hash[transaction_hash])
 
         # After processing the last fetched transaction, if we didn't do
         # anything that broke the sequence numbering, we can stop

@@ -1,9 +1,12 @@
+from copy import deepcopy
 from functools import partial
 from tinymongo import TinyMongoClient
 
 from . import io
 from datatypes import BankAccountTransaction, BankCreditCardTransaction, LocalAccountTransaction
 from datatypes import LocalAccount
+
+from collections import namedtuple
 
 
 def load(database_folder):
@@ -40,39 +43,40 @@ def insert_transaction(db, transaction):
         return io.insert_local_account_transaction(db, transaction)
 
 
-def update_account_transactions(db, account_number, fetched_transactions):
-    if not fetched_transactions:
-        return
-
-    # Get from the database all the transactions starting with the
-    # first one that matches the first fetched transaction
-    first_fetched_transaction = io.find_matching_account_transaction(db, account_number, fetched_transactions[0])
-    if first_fetched_transaction is not None:
-        existing_transactions = io.find_account_transactions(db, account_number, since_seq_number=first_fetched_transaction._seq)
-    else:
-        existing_transactions = io.find_account_transactions(db, account_number, since_date=fetched_transactions[0].transaction_date)
-
-    added = 0
-    updated = 0
-
-    converted_transactions = map(
-        lambda transaction: BankAccountTransaction(**transaction.__dict__),
-        fetched_transactions
+def update_credit_card_transactions(db, credit_card_number, raw_fetched_transactions):
+    return update_transactions(
+        db,
+        TransactionDataclass=BankCreditCardTransaction,
+        transaction_grouping_id=credit_card_number,
+        transaction_key_fields=['transaction_date', 'amount', 'type.name'],
+        operations=namedtuple('TransactionOperations', 'insert, update, find, find_one, find_matching, count')(
+            io.insert_credit_card_transaction,
+            io.update_credit_card_transaction,
+            io.find_credit_card_transactions,
+            io.find_one_credit_card_transaction,
+            io.find_matching_credit_card_transaction,
+            io.count_credit_card_transactions,
+        ),
+        raw_fetched_transactions=raw_fetched_transactions
     )
 
-    actions = {
-        'insert': [],
-        'update': []
-    }
 
-    for action, transaction in io.select_new_transactions(converted_transactions, existing_transactions, mode='account'):
-        actions[action].append(transaction)
-
-    # If any error raised due to selecting transactions, no action will be still executed
-    # we do it now
-
-    inserted = list(map(partial(io.insert_account_transaction, db), actions['insert']))
-    updated = list(map(partial(io.update_account_transaction, db), actions['update']))
+def update_account_transactions(db, account_number, raw_fetched_transactions):
+    inserted, updated = update_transactions(
+        db,
+        TransactionDataclass=BankAccountTransaction,
+        transaction_grouping_id=account_number,
+        transaction_key_fields=['transaction_date', 'amount', 'balance'],
+        operations=namedtuple('TransactionOperations', 'insert, update, find, find_one, find_matching, count')(
+            io.insert_account_transaction,
+            io.update_account_transaction,
+            io.find_account_transactions,
+            io.find_one_account_transaction,
+            io.find_matching_account_transaction,
+            io.count_account_transactions,
+        ),
+        raw_fetched_transactions=raw_fetched_transactions
+    )
 
     inconsistent_transaction = io.check_balance_consistency(db, account_number)
 
@@ -82,40 +86,112 @@ def update_account_transactions(db, account_number, fetched_transactions):
                 transaction=inconsistent_transaction)
         )
 
-    return (len(inserted), len(updated))
+    return (inserted, updated)
 
 
-def update_credit_card_transactions(db, credit_card_number, fetched_transactions):
-    if not fetched_transactions:
+def update_transactions(db, TransactionDataclass, transaction_grouping_id, transaction_key_fields, operations, raw_fetched_transactions):
+
+    if not raw_fetched_transactions:
         return
-
-    # Get from the database all the transactions starting with the
-    # first one that matches the first fetched transaction
-    first_fetched_transaction = io.find_matching_credit_card_transaction(db, credit_card_number, fetched_transactions[0])
-    if first_fetched_transaction is not None:
-        existing_transactions = io.find_credit_card_transactions(db, credit_card_number, since_seq_number=first_fetched_transaction._seq)
-    else:
-        existing_transactions = io.find_credit_card_transactions(db, credit_card_number, since_date=fetched_transactions[0].transaction_date)
-
-    converted_transactions = map(
-        lambda transaction: BankCreditCardTransaction(**transaction.__dict__),
-        fetched_transactions
-    )
 
     actions = {
         'insert': [],
         'update': []
     }
-    for action, transaction in io.select_new_transactions(converted_transactions, existing_transactions, mode='credit_card'):
+
+    def sequence_transactions(transactions, first_seq):
+        for seq, transaction in enumerate(transactions, first_seq):
+            _transaction = deepcopy(transaction)
+            _transaction._seq = seq
+            yield _transaction
+
+    def process_actions():
+        inserted = list(map(partial(operations.insert, db), actions['insert']))
+        updated = list(map(partial(operations.update, db), actions['update']))
+        return (len(inserted), len(updated))
+
+    fetched_transactions = list(map(
+        lambda transaction: TransactionDataclass(**transaction.__dict__),
+        raw_fetched_transactions
+    ))
+
+    # First use case: All fetched transactions are new
+
+    transaction_count = operations.count(db, transaction_grouping_id)
+    if transaction_count == 0:
+        actions['insert'].extend(
+            sequence_transactions(fetched_transactions, first_seq=0)
+        )
+        return process_actions()
+
+    # Next we process all use cases that we add a block of completely new
+    # transactions either on the head or on the tail, no overlaps
+
+    first_stored_transaction = operations.find_one(db, transaction_grouping_id, sort_seq=1)
+    last_stored_transaction = operations.find_one(db, transaction_grouping_id, sort_seq=-1)
+
+    first_fetched_transaction = fetched_transactions[0]
+    last_fetched_transaction = fetched_transactions[-1]
+
+    # All fetched transactions are newer
+    if first_fetched_transaction.transaction_date > last_stored_transaction.transaction_date:
+        actions['insert'].extend(
+            sequence_transactions(
+                fetched_transactions,
+                first_seq=last_stored_transaction._seq + 1
+            )
+        )
+        return process_actions()
+
+    # All fetched transactions are older
+    if last_fetched_transaction.transaction_date < first_stored_transaction.transaction_date:
+        existing_transactions = operations.find(
+            db, transaction_grouping_id
+        )
+
+        actions['insert'].extend(
+            sequence_transactions(
+                fetched_transactions,
+                first_seq=0
+            )
+        )
+        actions['update'].extend(
+            sequence_transactions(
+                existing_transactions,
+                first_seq=actions['insert'][-1]._seq + 1
+            )
+        )
+        return process_actions()
+
+    # At this point, we will have some kind of overlap. This overlap can match
+    # all, some or none of the fetched transactions on the database:
+
+    overlapping_transactions = list(filter(
+        bool,
+        map(
+            partial(operations.find_matching, db, transaction_grouping_id),
+            fetched_transactions
+        )
+    ))
+
+    # All transactions are newer and neither in the tail or head
+    # so we have a diverged history
+    if not overlapping_transactions:
+        raise io.DivergedHistoryError(first_fetched_transaction, 'All transactions overlap without matches')
+
+    # We have at least one overlapping, so at this point, the
+    # diff algorithm will take care of extracting the insertions, updates or
+    # diverged history events as needed
+
+    existing_transactions = operations.find(
+        db, transaction_grouping_id,
+        since_date=overlapping_transactions[0].transaction_date
+    )
+
+    for action, transaction in io.select_new_transactions(fetched_transactions, existing_transactions, transaction_key_fields):
         actions[action].append(transaction)
 
-    # If any error raised due to selecting transactions, no action will be still executed
-    # we do it now
-
-    inserted = list(map(partial(io.insert_credit_card_transaction, db), actions['insert']))
-    updated = list(map(partial(io.update_credit_card_transaction, db), actions['update']))
-
-    return (len(inserted), len(updated))
+    return process_actions()
 
 
 def update_transaction(db, transaction):
@@ -123,3 +199,4 @@ def update_transaction(db, transaction):
         BankAccountTransaction: io.update_account_transaction,
         BankCreditCardTransaction: io.update_credit_card_transaction
     }[transaction.__class__](db, transaction)
+

@@ -106,8 +106,11 @@ def table(records, show_balance=True):
     return tabulate(rows, headers=headers, tablefmt='presto')
 
 
-def table_all(records, filters=[]):
-    headers = ['Date', 'Origin', 'Amount', 'Type', 'Source', 'Destination', 'Category', 'Tags', 'Comment']
+def table_all(records, filters=[], show_balance=False):
+    headers = ['Date', 'Origin', 'Amount', 'Balance', 'Type', 'Source', 'Destination', 'Category', 'Tags', 'Comment']
+
+    if show_balance is False:
+        headers.remove('Balance')
 
     def format_destination(destination):
         if destination is None:
@@ -134,6 +137,9 @@ def table_all(records, filters=[]):
         row.append(record.transaction_date.strftime('%Y/%m/%d'))
         row.append('{}:{}'.format(bank, method))
         row.append(record.amount)
+        if show_balance:
+            row.append(record.balance)
+
         row.append(record.type.value if record.type is not None else '--')
         row.append(format_destination(record.source))
         row.append(format_destination(record.destination))
@@ -259,6 +265,15 @@ if __name__ == '__main__':
     except database.DatabaseError as exc:
         print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
         sys.exit(1)
+    except exceptions.InteractionError as exc:
+        print(exc.message)
+        sys.exit(1)
+    except exceptions.SomethingChangedError as exc:
+        print(exc.message)
+        sys.exit(1)
+    except Exception:
+        print(traceback.format_exc())
+        sys.exit(1)
 
     if action == 'get':
         cache_filename = '.cache/{bank}_{source}_{id}_{from_date}_{to_date}.json'.format(
@@ -353,7 +368,7 @@ if __name__ == '__main__':
 
         filters_argument = arguments['--filter'] if arguments['--filter'] is not None else ''
         parsed_filters = list(map(lambda f: f.lower(), filters_argument.split(',')))
-        print(table_all(transactions, filters=parsed_filters))
+        print(table_all(transactions, filters=parsed_filters, show_balance=target == 'account'))
         sys.exit(0)
 
     if action == 'load' and load_raw:
