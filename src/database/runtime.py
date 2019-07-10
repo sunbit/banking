@@ -95,7 +95,7 @@ def update_account_transactions(db, account_number, raw_fetched_transactions):
                 transaction=inconsistent_transaction)
         )
 
-    duplicated_sequence_found = io.check_account_number_sequence_numbering_consistency(db, account_number)
+    duplicated_sequence_found = io.check_account_sequence_numbering_consistency(db, account_number)
 
     if duplicated_sequence_found:
         raise io.DatabaseError('Duplicated sequence numbers detected: {}'.format(
