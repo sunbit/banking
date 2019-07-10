@@ -17,13 +17,13 @@ def load(database_folder):
 
 def last_account_transaction_date(db, account_number):
     collection = db.account_transactions
-    results = io.find_account_transactions(collection, account_number)
+    results = io.find_account_transactions(collection, account_number, sort_field='transaction_date.date')
     return results[-1].transaction_date if results else None
 
 
 def last_credit_card_transaction_date(db, credit_card_number):
     collection = db.credit_card_transactions
-    results = io.find_credit_card_transactions(collection, credit_card_number)
+    results = io.find_credit_card_transactions(collection, credit_card_number, sort_field='transaction_date.date')
     return results[-1].transaction_date if results else None
 
 
@@ -44,7 +44,7 @@ def insert_transaction(db, transaction):
 
 
 def update_credit_card_transactions(db, credit_card_number, raw_fetched_transactions):
-    return update_transactions(
+    inserted, updated = update_transactions(
         db,
         TransactionDataclass=BankCreditCardTransaction,
         transaction_grouping_id=credit_card_number,
@@ -59,6 +59,15 @@ def update_credit_card_transactions(db, credit_card_number, raw_fetched_transact
         ),
         raw_fetched_transactions=raw_fetched_transactions
     )
+
+    duplicated_sequence_found = io.check_credit_card_sequence_numbering_consistency(db, credit_card_number)
+
+    if duplicated_sequence_found:
+        raise io.DatabaseError('Duplicated sequence numbers detected: {}'.format(
+            str(duplicated_sequence_found))
+        )
+
+    return (inserted, updated)
 
 
 def update_account_transactions(db, account_number, raw_fetched_transactions):
@@ -84,6 +93,13 @@ def update_account_transactions(db, account_number, raw_fetched_transactions):
         raise io.DatabaseError(
             'Balance is inconsistent at {transaction.transaction_date} [balance={transaction.balance}, amount={transaction.amount}]'.format(
                 transaction=inconsistent_transaction)
+        )
+
+    duplicated_sequence_found = io.check_account_number_sequence_numbering_consistency(db, account_number)
+
+    if duplicated_sequence_found:
+        raise io.DatabaseError('Duplicated sequence numbers detected: {}'.format(
+            str(duplicated_sequence_found))
         )
 
     return (inserted, updated)

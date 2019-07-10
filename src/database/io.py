@@ -1,4 +1,5 @@
 
+from collections import Counter
 from datetime import datetime
 from dataclasses import is_dataclass
 from difflib import Differ
@@ -198,7 +199,7 @@ def find_one_account_transaction(db, account_number, sort_seq=1):
     return decode_transaction(results[0])
 
 
-def find_account_transactions(db, account_number=None, since_seq_number=None, since_date=None):
+def find_account_transactions(db, account_number=None, since_seq_number=None, since_date=None, sort_field='_seq', sort_direction=1):
     collection = db.account_transactions
     query = {}
 
@@ -215,7 +216,7 @@ def find_account_transactions(db, account_number=None, since_seq_number=None, si
         decode_transaction,
         collection.find(
             query,
-            sort=[('_seq', 1)]
+            sort=[(sort_field, sort_direction)]
         )
     ))
 
@@ -255,7 +256,10 @@ def find_matching_credit_card_transaction(db, credit_card_number, transaction):
         return None
 
     if len(results) > 1:
-        raise DatabaseError('Found more than one match for a transaction, check the algorithm')
+        raise DatabaseError('Found more than one match for a transaction, check the algorithm [{date} {amount}]'.format(
+            date=encode_date(transaction.transaction_date),
+            amount=transaction.amount
+        ))
 
     return decode_transaction(results[0])
 
@@ -275,7 +279,7 @@ def find_one_credit_card_transaction(db, credit_card_number, sort_seq=1):
     return decode_transaction(results[0])
 
 
-def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=None, since_date=None):
+def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=None, since_date=None, sort_field='_seq', sort_direction=1):
     collection = db.credit_card_transactions
     query = {}
 
@@ -292,7 +296,7 @@ def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=
         decode_transaction,
         collection.find(
             query,
-            sort=[('_seq', 1)]
+            sort=[(sort_field, sort_direction)]
         )
     ))
 
@@ -347,6 +351,22 @@ def check_balance_consistency(db, account_number):
         last_balance = transaction.balance
 
     return None
+
+
+def check_account_sequence_numbering_consistency(db, account_number):
+    collection = db.account_transactions
+    results = find_account_transactions(collection, account_number)
+
+    duplicated_seq_numbers = list(map(lambda x: x[0], filter(lambda x: x[1] > 1, Counter([a._seq for a in results]).items())))
+    return duplicated_seq_numbers
+
+
+def check_credit_card_sequence_numbering_consistency(db, credit_card_number):
+    collection = db.credit_card_transactions
+    results = find_credit_card_transactions(collection, credit_card_number)
+
+    duplicated_seq_numbers = list(map(lambda x: x[0], filter(lambda x: x[1] > 1, Counter([a._seq for a in results]).items())))
+    return duplicated_seq_numbers
 
 
 def select_new_transactions(fetched_transactions, db_transactions, transaction_key_fields):
