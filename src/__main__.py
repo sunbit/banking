@@ -259,7 +259,7 @@ if __name__ == '__main__':
 
         if action == 'update' and target == 'card':
             db = database.load(bank.env()['database_folder'])
-            bank.update_bank_credit_card_transactions(db, bank_config, account_config, credit_card_config, from_date, datetime.now())
+            bank.update_bank_credit_card_transactions(db, bank_config, account_config, credit_card_config, from_date, to_date)
             sys.exit(0)
 
     except database.DatabaseError as exc:
