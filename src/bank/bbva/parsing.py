@@ -345,7 +345,9 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
     is_debit_operation = transaction.get('operationTypeIndicator') == 'D'
     is_consolidated = transaction.get('status', {}).get('id') == '7'
 
-    if is_debit_operation:
+    notify_not_added = False
+
+    if is_debit_operation and notify_not_added:
         from common.notifications import get_notifier
         import bank
         banking_configuration = bank.load_config(bank.env()['main_config_file'])
@@ -355,7 +357,7 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
         )
         return None
 
-    if not is_consolidated:
+    if not is_consolidated and notify_not_added:
         from common.notifications import get_notifier
         import bank
         banking_configuration = bank.load_config(bank.env()['main_config_file'])

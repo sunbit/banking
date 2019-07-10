@@ -268,12 +268,12 @@ def update_all(banking_config, env):
             except database.DatabaseError as exc:
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
                 logger.error(str(exc))
-            except Exception as exc:
-                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, traceback=traceback.format_exc()))
-                logger.error(str(exc))
             except (exceptions.SomethingChangedError, exceptions.InteractionError) as exc:
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
                 logger.error(exc.message)
+            except Exception as exc:
+                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, traceback=traceback.format_exc()))
+                logger.error(str(exc))
 
     for card_number, card in banking_config.cards.items():
         if card.type == 'credit' and card.active:
@@ -302,15 +302,15 @@ def update_all(banking_config, env):
             except database.DatabaseError as exc:
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))
                 logger.error(str(exc))
-            except Exception as exc:
-                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, traceback=traceback.format_exc()))
-                logger.error(str(exc))
             except (exceptions.SomethingChangedError, exceptions.InteractionError) as exc:
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))
                 logger.error(exc.message)
             except (exceptions.ParsingError) as exc:
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))
                 logger.error(exc.message)
+            except Exception as exc:
+                failure.append(UNKNOWN_UPDATE_EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, traceback=traceback.format_exc()))
+                logger.error(str(exc))
 
     notifier = get_notifier(banking_config.notifications)
 
