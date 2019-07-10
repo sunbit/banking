@@ -176,7 +176,7 @@ def update_bank_account_transactions(db, bank_config, account_config, from_date,
 
     parsed_transactions = parse_account_transactions(bank_module, bank_config, account_config, raw_transactions)
     filtered_transactions = list(filter(
-        lambda transaction: transaction.transaction_date >= from_date,
+        lambda transaction: transaction.transaction_date >= from_date and transaction.transaction_date <= to_date,
         parsed_transactions
     ))
     discarded_transactions_count = len(parsed_transactions) - len(filtered_transactions)
@@ -209,7 +209,7 @@ def update_bank_credit_card_transactions(db, bank_config, account_config, card_c
 
     parsed_transactions = parse_credit_card_transactions(bank_module, bank_config, account_config, card_config, raw_transactions)
     filtered_transactions = list(filter(
-        lambda transaction: transaction.transaction_date >= from_date,
+        lambda transaction: transaction.transaction_date >= from_date and transaction.transaction_date <= to_date,
         parsed_transactions
     ))
     discarded_transactions_count = len(parsed_transactions) - len(filtered_transactions)
