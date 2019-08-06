@@ -42,10 +42,14 @@ def login(browser, username, password):
 
     # Close popup if any
     log('Waiting for popups to close them')
-    modal_close_button = browser.find_element_by_css_selector('div.modal button.close', timeout=10, do_raise=False)
-    if modal_close_button is not None:
-        modal_close_button.click()
-        log('Popup closed')
+    modal_close_buttons = browser.find_elements_by_css_selector('div.modal button', timeout=10, do_raise=False)
+    if modal_close_buttons:
+        buttons = modal_close_buttons.filter(lambda el: 'cerrar' in el.text.lower())
+        if buttons:
+            buttons[0].forced_click()
+            log('Popup closed')
+        else:
+            log('No popups found')
     else:
         log('No popups found')
 

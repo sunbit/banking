@@ -347,24 +347,26 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
 
     notify_not_added = False
 
-    if is_debit_operation and notify_not_added:
-        from common.notifications import get_notifier
-        import bank
-        banking_configuration = bank.load_config(bank.env()['main_config_file'])
-        notifier = get_notifier(banking_configuration.notifications)
-        notifier('Debit transaction found, not adding {bank.name} card transaction: {date} {amount}, {source}->{destination}'.format(
-            bank=bank_config, amount=amount, date=transaction['valueDate'], source=str(source), destination=str(destination))
-        )
+    if is_debit_operation:
+        if notify_not_added:
+            from common.notifications import get_notifier
+            import bank
+            banking_configuration = bank.load_config(bank.env()['main_config_file'])
+            notifier = get_notifier(banking_configuration.notifications)
+            notifier('Debit transaction found, not adding {bank.name} card transaction: {date} {amount}, {source}->{destination}'.format(
+                bank=bank_config, amount=amount, date=transaction['valueDate'], source=str(source), destination=str(destination))
+            )
         return None
 
     if not is_consolidated and notify_not_added:
-        from common.notifications import get_notifier
-        import bank
-        banking_configuration = bank.load_config(bank.env()['main_config_file'])
-        notifier = get_notifier(banking_configuration.notifications)
-        notifier('Non consolidated transaction found, not adding {bank.name} card transaction: {date} {amount}, {source}->{destination}'.format(
-            bank=bank_config, amount=amount, date=transaction['valueDate'], source=str(source), destination=str(destination))
-        )
+        if notify_not_added:
+            from common.notifications import get_notifier
+            import bank
+            banking_configuration = bank.load_config(bank.env()['main_config_file'])
+            notifier = get_notifier(banking_configuration.notifications)
+            notifier('Non consolidated transaction found, not adding {bank.name} card transaction: {date} {amount}, {source}->{destination}'.format(
+                bank=bank_config, amount=amount, date=transaction['valueDate'], source=str(source), destination=str(destination))
+            )
         return None
 
     return ParsedCreditCardTransaction(
