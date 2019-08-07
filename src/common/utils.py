@@ -4,6 +4,10 @@ from dataclasses import is_dataclass
 from enum import Enum, EnumMeta
 from json import JSONEncoder, JSONDecoder
 import datatypes
+import time
+import traceback
+from functools import wraps
+from exceptions import RetryException
 
 
 def parse_bool(value):
@@ -78,3 +82,55 @@ class AutoJSONEncoder(JSONEncoder):
         return JSONEncoder.default(self, obj)
 
 
+def traceback_summary(original_traceback, original_exception):
+    """
+        Returns a one line summary of the exception focusing on the last line of the codebase
+        that triggered the exception.
+    """
+    exception_lines = re.findall(r'File\s+".*?src/(.*?).py".*?line\s+(\d+),\s+in\s+(.*?)\n\s+([^\n]+)\n', original_traceback, re.MULTILINE | re.DOTALL)
+    if len(exception_lines) == 0:
+        return "Couldn't parse traceback, here's the raw one:\n" + original_traceback
+    file, line, function, code = exception_lines[-1]
+
+    return "{exception}: {message}. Triggered at {module}.{function}L{line} [`{code}`]".format(
+        exception=original_exception.__class__.__name__,
+        message=str(original_exception),
+        module=file.replace('/', '.'),
+        function=function,
+        line=line,
+        code=code
+    )
+
+
+def retry(exceptions, tries=4, delay=3, backoff=2, logger=None, do_raise=True):
+    def deco_retry(f):
+
+        @wraps(f)
+        def f_retry(*args, **kwargs):
+            mtries, mdelay = tries, delay
+            while mtries > 1:
+                try:
+                    return f(*args, **kwargs)
+                except exceptions as exc:
+                    msg = '{}, Retrying in {} seconds...'.format(exc, mdelay)
+                    if logger:
+                        logger.warning(msg)
+                    else:
+                        print(msg)
+                    time.sleep(mdelay)
+                    mtries -= 1
+                    mdelay *= backoff
+                    last_raised_exception = exc
+                    last_raised_traceback = traceback.format_exc()
+
+            # If we reach here, all retries have failed
+            # raise the custom exception or trigger the original one
+            if do_raise:
+                raise RetryException("Exception raised after {tries} tries: {trigger}".format(
+                    tries=tries,
+                    trigger=traceback_summary(last_raised_traceback, last_raised_exception)
+                ))
+
+            return f(*args, **kwargs)
+        return f_retry
+    return deco_retry

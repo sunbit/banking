@@ -29,3 +29,7 @@ class ScrappingError(Exception):
 
 class ParsingError(Exception):
     pass
+
+
+class RetryException(Exception):
+    pass

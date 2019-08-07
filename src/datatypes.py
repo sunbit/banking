@@ -270,6 +270,7 @@ class BankAccountTransaction():
     category: Category = None
     tags: list = field(default_factory=list)
     flags: ModifiedFlags = field(default_factory=ModifiedFlags)
+    status_flags: StatusFlags = field(default_factory=StatusFlags)
     subtransactions: list = field(default_factory=list)
     related: RelatedTransaction = None
     offset: RelatedTransaction = None

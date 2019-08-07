@@ -5,10 +5,15 @@ import re
 import time
 
 from common.logging import get_logger
+from common.utils import retry
 from exceptions import ScrappingError
 from scrapper.scripts import xhr_intercept_response
 from scrapper.driver import forced_click
 
+from selenium.common.exceptions import (
+    TimeoutException,
+    WebDriverException
+)
 
 logger = get_logger(name='scrapper')
 
@@ -21,6 +26,7 @@ def encode_date(dt):
     return dt.strftime('%d/%m/%Y')
 
 
+@retry(exceptions=(TimeoutException, WebDriverException), logger=logger)
 def login(browser, username, password):
     log('Loading BANKIA main page')
     browser.get('https://www.bankia.es')
@@ -54,6 +60,7 @@ def login(browser, username, password):
         log('No popups found')
 
 
+@retry(exceptions=(TimeoutException, WebDriverException), logger=logger)
 def get_account_transactions(browser, account_number, from_date, to_date):
 
     log('Loading BANKIA account list page')
@@ -131,6 +138,7 @@ def get_account_transactions(browser, account_number, from_date, to_date):
     return results
 
 
+@retry(exceptions=(TimeoutException, WebDriverException), logger=logger)
 def get_credit_card_transactions(browser, card_number, from_date, to_date):
 
     log('Open dedicated account page')

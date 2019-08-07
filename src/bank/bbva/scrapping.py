@@ -1,10 +1,16 @@
 from scrapper.scripts import xhr_intercept_response
 from common.logging import get_logger
 from itertools import chain
+from common.utils import retry
 
 import json
 import time
 
+
+from selenium.common.exceptions import (
+    TimeoutException,
+    WebDriverException
+)
 
 FIX_NULL_DATE_ACCOUNT = """
 try {{
@@ -53,6 +59,7 @@ def encode_date(dt):
     return dt.strftime('%d/%m/%Y')
 
 
+@retry(exceptions=(TimeoutException, WebDriverException), logger=logger)
 def login(browser, username, password):
     log('Loading BBVA main page')
     browser.get('https://www.bbva.es')
@@ -72,6 +79,7 @@ def login(browser, username, password):
     browser.find_element_by_css_selector('#t-main-content', visible=True, timeout=20)
 
 
+@retry(exceptions=(TimeoutException, WebDriverException), logger=logger)
 def get_account_transactions(browser, account_number, from_date, to_date):
 
     browser.get('https://web.bbva.es/index.html')
@@ -134,6 +142,7 @@ def get_account_transactions(browser, account_number, from_date, to_date):
     return results
 
 
+@retry(exceptions=(TimeoutException, WebDriverException), logger=logger)
 def get_credit_card_transactions(browser, card_number, from_date, to_date):
 
     browser.get('https://web.bbva.es/index.html')
