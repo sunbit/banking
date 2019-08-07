@@ -186,12 +186,14 @@ def update_bank_account_transactions(db, bank_config, account_config, from_date,
     processed_transactions = rules.apply(rules.load(), filtered_transactions)
     logger.info('Rules applied to {} transactions'.format(len(processed_transactions)))
 
-    added, _ = database.update_account_transactions(db, account_config.id, processed_transactions)
+    removed, added, _ = database.update_account_transactions(db, account_config.id, processed_transactions)
     if added:
         logger.info('Successfully added {} account transactions to the database.'.format(added))
     else:
         logger.info('There are no new account transactions to add'.format(len(raw_transactions)))
-    return added
+    if removed:
+        logger.info('Successfully removed {} transactions from the database'.format(removed))
+    return (removed, added)
 
 
 def update_bank_credit_card_transactions(db, bank_config, account_config, card_config, from_date, to_date):
@@ -219,12 +221,14 @@ def update_bank_credit_card_transactions(db, bank_config, account_config, card_c
     processed_transactions = rules.apply(rules.load(), filtered_transactions)
     logger.info('Rules applied to {} transactions'.format(len(processed_transactions)))
 
-    added, _ = database.update_credit_card_transactions(db, card_config.number, processed_transactions)
+    removed, added, _ = database.update_credit_card_transactions(db, card_config.number, processed_transactions)
     if added:
         logger.info('Successfully added {} credit card transactions to the database.'.format(added))
     else:
         logger.info('There are no new card transactions to add'.format(len(raw_transactions)))
-    return added
+    if removed:
+        logger.info('Successfully removed {} transactions from the database'.format(removed))
+    return (removed, added)
 
 
 UPDATE_EXCEPTION_MESSAGE = """While updating *{bank.name}* {source} *{id}* transactions the following error occurred:
@@ -257,13 +261,19 @@ def update_all(banking_config, env):
 
                 # Query until current day and hour
                 to_date = datetime.now()
-                added = update_bank_account_transactions(db, bank, account, from_date, to_date)
+                removed, added = update_bank_account_transactions(db, bank, account, from_date, to_date)
 
                 if added:
                     success.append('Added {added} new transactions for *{bank.name}* account *{account.id}*'.format(
                         bank=bank,
                         account=account,
                         added=added
+                    ))
+                if added:
+                    success.append('Removed {removed} transactions for *{bank.name}* account *{account.id}*'.format(
+                        bank=bank,
+                        account=account,
+                        removed=removed
                     ))
             except database.DatabaseError as exc:
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
@@ -291,13 +301,19 @@ def update_all(banking_config, env):
 
                 card_account = banking_config.accounts[card.account_number]
                 card_bank = banking_config.banks[card_account.bank_id]
-                added = update_bank_credit_card_transactions(db, card_bank, card_account, card, from_date, to_date)
+                removed, added = update_bank_credit_card_transactions(db, card_bank, card_account, card, from_date, to_date)
 
                 if added:
                     success.append('Added {added} new transactions for *{bank.name}* card *{card.number}*'.format(
                         bank=card_bank,
                         card=card,
                         added=added
+                    ))
+                if removed:
+                    success.append('Removed {removed} transactions for *{bank.name}* card *{card.number}*'.format(
+                        bank=card_bank,
+                        card=card,
+                        removed=removed
                     ))
             except database.DatabaseError as exc:
                 failure.append(UPDATE_EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))

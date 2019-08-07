@@ -6,6 +6,7 @@ Usage:
   banking update <bank> (account|card) transactions [options]
   banking load <bank> (account|card) transactions [options]
   banking load all transactions [--filter=<filters>]
+  banking remove <bank> (account|card) transaction <seq> [options]
   banking apply rules
   banking load <bank> (account|card) raw transactions <raw-filename> [options]
   banking run server
@@ -107,7 +108,7 @@ def table(records, show_balance=True):
 
 
 def table_all(records, filters=[], show_balance=False):
-    headers = ['Date', 'Origin', 'Amount', 'Balance', 'Type', 'Source', 'Destination', 'Category', 'Tags', 'Comment']
+    headers = ["Seq", 'Date', 'Origin', 'Amount', 'Balance', 'Type', 'Source', 'Destination', 'Category', 'Tags', 'Comment']
 
     if show_balance is False:
         headers.remove('Balance')
@@ -134,6 +135,7 @@ def table_all(records, filters=[], show_balance=False):
         bank = 'BBVA' if 'BBVA' in getattr(record, record_type).name.upper() else 'BANKIA'
 
         row = []
+        row.append(record._seq)
         row.append(record.transaction_date.strftime('%Y/%m/%d'))
         row.append('{}:{}'.format(bank, method))
         row.append(record.amount)
@@ -175,7 +177,7 @@ if __name__ == '__main__':
     arguments = docopt(__doc__, version='Banking 1.0')
     banking_configuration = bank.load_config(bank.env()['main_config_file'])
 
-    action = list(filter(lambda action: arguments[action] is True, ['get', 'load', 'apply', 'update', 'run']))[0]
+    action = list(filter(lambda action: arguments[action] is True, ['get', 'load', 'apply', 'update', 'run', 'remove']))[0]
     target = list(filter(lambda target: arguments[target] is True, ['account', 'card', 'server', 'all']))[0]
 
     load_raw = arguments['raw']
@@ -250,30 +252,58 @@ if __name__ == '__main__':
         account_config.cards.values()
     ))[0]
 
-    try:
+    if action == 'remove':
+        sequence_number = int(arguments['<seq>'])
+        db = database.load(bank.env()['database_folder'])
+        card = datatypes.Card.from_config(credit_card_config)
+        transactions = database.find_transactions(db, card, _seq=int(arguments['<seq>']))
+        database.remove_transactions(db, transactions)
 
-        if action == 'update' and target == 'account':
-            db = database.load(bank.env()['database_folder'])
-            bank.update_bank_account_transactions(db, bank_config, account_config, from_date, to_date)
+    if action == 'update':
+        try:
+            if target == 'account':
+                db = database.load(bank.env()['database_folder'])
+                removed, added = bank.update_bank_account_transactions(db, bank_config, account_config, from_date, to_date)
+            if target == 'card':
+                db = database.load(bank.env()['database_folder'])
+                removed, added = bank.update_bank_credit_card_transactions(db, bank_config, account_config, credit_card_config, from_date, to_date)
+
+        except database.DivergedHistoryError as exc:
+            if target == 'account':
+                print("\nERROR while adding new account transactions: {}\n".format(exc.message))
+            if target == 'card':
+                print("\nERROR while adding new credit card transactions: {}\n".format(exc.message))
+            sys.exit(1)
+        except database.DatabaseError as exc:
+            if target == 'account':
+                print("\nERROR in database consistency while adding new account transactions: {}\n".format(exc.args[0]))
+            if target == 'card':
+                print("\nERROR in database consistency while adding new credit card transactions: {}\n".format(exc.args[0]))
+            sys.exit(1)
+        except exceptions.InteractionError as exc:
+            print(exc.message)
+            sys.exit(1)
+        except exceptions.SomethingChangedError as exc:
+            print(exc.message)
+            sys.exit(1)
+        except Exception:
+            print(traceback.format_exc())
+            sys.exit(1)
+
+        else:
+            if target == 'account':
+                print('Added {added} new transactions for *{bank.name}* account *{account.id}*'.format(
+                    bank=bank_config,
+                    account=account_config,
+                    added=added
+                ))
+            if target == 'card':
+                print('Added {added} new transactions for *{bank.name}* card *{card.number}*'.format(
+                    bank=bank_config,
+                    card=credit_card_config,
+                    added=added
+                ))
             sys.exit(0)
-
-        if action == 'update' and target == 'card':
-            db = database.load(bank.env()['database_folder'])
-            bank.update_bank_credit_card_transactions(db, bank_config, account_config, credit_card_config, from_date, to_date)
-            sys.exit(0)
-
-    except database.DatabaseError as exc:
-        print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
-        sys.exit(1)
-    except exceptions.InteractionError as exc:
-        print(exc.message)
-        sys.exit(1)
-    except exceptions.SomethingChangedError as exc:
-        print(exc.message)
-        sys.exit(1)
-    except Exception:
-        print(traceback.format_exc())
-        sys.exit(1)
 
     if action == 'get':
         cache_filename = '.cache/{bank}_{source}_{id}_{from_date}_{to_date}.json'.format(
@@ -333,30 +363,6 @@ if __name__ == '__main__':
         for filename in files_to_write:
             with open(filename, 'w') as export_file:
                 json.dump(raw_transactions, export_file, indent=4)
-
-        if arguments['--update']:
-            if target == 'account':
-                try:
-                    added = bank.update_bank_account_transactions(database.load(bank.env()['database_folder']), bank_config, account_config, from_date, to_date)
-                except database.DatabaseError as exc:
-                    print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
-                    sys.exit(1)
-                print('Added {added} new transactions for *{bank.name}* account *{account.id}*'.format(
-                    bank=bank_config,
-                    account=account_config,
-                    added=added
-                ))
-            if target == 'card':
-                try:
-                    added = bank.update_bank_credit_card_transactions(database.load(bank.env()['database_folder']), bank_config, account_config, credit_card_config, from_date, to_date)
-                except database.DatabaseError as exc:
-                    print("\nERROR in datatbase consistency while adding new records: {}\n".format(exc.args[0]))
-                    sys.exit(1)
-                print('Added {added} new transactions for *{bank.name}* card *{card.number}*'.format(
-                    bank=bank_config,
-                    card=credit_card_config,
-                    added=added
-                ))
 
     if action == 'load' and not load_raw:
         db = database.load(bank.env()['database_folder'])

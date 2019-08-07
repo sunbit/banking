@@ -223,6 +223,13 @@ def find_account_transactions(db, account_number=None, since_seq_number=None, si
     return results
 
 
+def remove_account_transaction(db, transaction):
+    collection = db.account_transactions
+    collection.remove({
+        '_id': transaction._id
+    })
+
+
 def insert_account_transaction(db, transaction):
     collection = db.account_transactions
     return collection.insert_one(encode_transaction(transaction))
@@ -279,7 +286,7 @@ def find_one_credit_card_transaction(db, credit_card_number, sort_seq=1):
     return decode_transaction(results[0])
 
 
-def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=None, since_date=None, sort_field='_seq', sort_direction=1):
+def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=None, since_date=None, _seq=None, sort_field='_seq', sort_direction=1):
     collection = db.credit_card_transactions
     query = {}
 
@@ -288,6 +295,9 @@ def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=
 
     if since_seq_number is not None:
         query['_seq'] = {"$gte": since_seq_number}
+
+    if _seq is not None:
+        query['_seq'] = _seq
 
     if since_date is not None:
         query['transaction_date.date'] = {'$gte': encode_date(since_date)}
@@ -301,6 +311,13 @@ def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=
     ))
 
     return results
+
+
+def remove_credit_card_transaction(db, transaction):
+    collection = db.credit_card_transactions
+    collection.remove({
+        '_id': transaction._id
+    })
 
 
 def insert_credit_card_transaction(db, transaction):
@@ -329,7 +346,7 @@ def align_decimal(number):
     return aligned
 
 
-def log_action(transaction, action):
+# def log_action(transaction, action):
     print('> {action:2}  {m._seq:02}  {m.transaction_date}  {amount} '.format(
         m=transaction,
         action=action,
@@ -400,9 +417,12 @@ def select_new_transactions(fetched_transactions, db_transactions, transaction_k
 
     # TODO Check for duplicate hashes
 
-    diff = list(Differ().compare(
-        list(map(itemgetter(0), hashed_db_transactions)),
-        list(map(itemgetter(0), hashed_fetched_transactions))
+    diff = list(filter(
+        lambda x: x[0] != '?',
+        list(Differ().compare(
+            list(map(itemgetter(0), hashed_db_transactions)),
+            list(map(itemgetter(0), hashed_fetched_transactions))
+        ))
     ))
 
     next_seq_number = 0
@@ -414,23 +434,46 @@ def select_new_transactions(fetched_transactions, db_transactions, transaction_k
     # pprint(diff)
     # print()
 
+    diverged = []
+
     for item in diff:
 
         action = item[0]
         transaction_hash = item[2:]
+        # This will be set to None when the current transaction is a db transaction
+        # that is not present in the fetched ones. This indicates that this batch has
+        # a diversion that will be checked, but shouldn't be a problem
+        fetched_transaction = fetched_transactions_by_hash.get(transaction_hash)
 
         if transaction_hash == hashed_fetched_transactions[-1][0]:
             all_fetched_processed = True
 
-        if action == '+':
+        if action == '+' and fetched_transaction.status_flags.invalid:
+            # We have detected a fetched transaction that should not be there, we'll skip it
+            # and also try to delete it's counterpart if any diverged transaction has been found so far:
+            matching_diverged = list(filter(
+                lambda diverged_transaction: diverged_transaction.amount == fetched_transaction.amount and diverged_transaction.transaction_date == fetched_transaction.transaction_date,
+                diverged
+            ))
+
+            if len(matching_diverged) > 1:
+                raise DivergedHistoryError(matching_diverged[0], "Multiple matches found while trying to resolve a diverged history")
+
+            if len(matching_diverged) == 0:
+                # Just skip
+                break
+
+            yield ('remove', matching_diverged[0])
+            diverged = list(filter(lambda diverged_transaction: diverged_transaction != matching_diverged[0], diverged))
+
+        elif action == '+':
             # We have a transaction in fetched that it's not on the database
-            transaction = fetched_transactions_by_hash[transaction_hash]
-            new_transaction = deepcopy(transaction)
+            new_transaction = deepcopy(fetched_transaction)
             new_transaction._seq = next_seq_number
             yield ('insert', new_transaction)
             next_seq_number += 1
             sequence_change_needed = True
-            # log_action(new_transaction, '+')
+            # log_action(new_transaction, '+')
 
         elif action == ' ' and not sequence_change_needed:
             # this transaction is on both db and fetched transactions
@@ -438,7 +481,7 @@ def select_new_transactions(fetched_transactions, db_transactions, transaction_k
             # be used if we have new fetched transactions at the tail
             # or we need to cascade change sequence numbers
             next_seq_number = db_transactions_by_hash[transaction_hash]._seq + 1
-            # log_action(db_transactions_by_hash[transaction_hash], 's')
+            # log_action(db_transactions_by_hash[transaction_hash], 's')
 
         elif sequence_change_needed and action == ' ':
             # this transaction is on both db and fetched transactions but we inserted
@@ -448,7 +491,7 @@ def select_new_transactions(fetched_transactions, db_transactions, transaction_k
             updated_transaction._seq = next_seq_number
             yield ('update', updated_transaction)
             next_seq_number += 1
-            # log_action(updated_transaction, 'u')
+            # log_action(updated_transaction, 'u')
 
         elif action == '-' and all_fetched_processed and sequence_change_needed:
             # this transaction is only on db but as something happened
@@ -458,19 +501,22 @@ def select_new_transactions(fetched_transactions, db_transactions, transaction_k
             updated_transaction._seq = next_seq_number
             yield ('update', updated_transaction)
             next_seq_number += 1
-            # log_action(updated_transaction, 'u-')
+            # log_action(updated_transaction, 'u-')
 
         elif action == '-' and all_fetched_processed and not sequence_change_needed:
             # This will never happen, as the last conditional in the loop breaks it
             # the as soon as all fetched items are processed
-            # log_action(transaction, '?')
+            # log_action(fetched_transaction, '?')
             pass
 
         elif action == '-' and not all_fetched_processed:
-            raise DivergedHistoryError(db_transactions_by_hash[transaction_hash])
+            diverged.append(db_transactions_by_hash[transaction_hash])
 
         # After processing the last fetched transaction, if we didn't do
         # anything that broke the sequence numbering, we can stop
         if all_fetched_processed and not sequence_change_needed:
             # print('X Quitting, all fetched processed')
             break
+
+    if diverged:
+        raise DivergedHistoryError(db_transactions_by_hash[transaction_hash])

@@ -181,6 +181,10 @@ class ModifiedFlags():
     tags: int = DataOrigin.ORIGINAL
     category: int = DataOrigin.ORIGINAL
 
+@dataclass
+class StatusFlags():
+    invalid: bool = False
+
 
 @dataclass
 class ParsedBankAccountTransaction():
@@ -199,6 +203,7 @@ class ParsedBankAccountTransaction():
     keywords: list
     comment: str
     flags: ModifiedFlags = field(default_factory=ModifiedFlags)
+    status_flags: StatusFlags = field(default_factory=StatusFlags)
     category: str= None
     tags: list = field(default_factory=list)
 
@@ -218,6 +223,7 @@ class ParsedCreditCardTransaction():
     keywords: list
     comment: str
     flags: ModifiedFlags = field(default_factory=ModifiedFlags)
+    status_flags: StatusFlags = field(default_factory=StatusFlags)
     category: str = None
     tags: list = field(default_factory=list)
 
@@ -238,6 +244,7 @@ class BankCreditCardTransaction():
     category: Category = None
     tags: list = field(default_factory=list)
     flags: ModifiedFlags = field(default_factory=ModifiedFlags)
+    status_flags: StatusFlags = field(default_factory=StatusFlags)
     subtransactions: list = field(default_factory=list)
     related: RelatedTransaction = None
     _id: str = None

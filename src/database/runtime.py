@@ -4,9 +4,10 @@ from tinymongo import TinyMongoClient
 
 from . import io
 from datatypes import BankAccountTransaction, BankCreditCardTransaction, LocalAccountTransaction
-from datatypes import LocalAccount
+from datatypes import LocalAccount, Card
 
 from collections import namedtuple
+from functools import partial
 
 
 def load(database_folder):
@@ -30,6 +31,8 @@ def last_credit_card_transaction_date(db, credit_card_number):
 def find_transactions(db, account, **query):
     if isinstance(account, LocalAccount):
         return io.find_local_account_transactions(db, account_id=account.id, **query)
+    if isinstance(account, Card):
+        return io.find_credit_card_transactions(db, credit_card_number=account.number, **query)
 
 
 def get_account_balance(db, account):
@@ -43,19 +46,29 @@ def insert_transaction(db, transaction):
         return io.insert_local_account_transaction(db, transaction)
 
 
+def remove_transactions(db, transactions):
+    list(map(partial(remove_transaction, db), transactions))
+
+
+def remove_transaction(db, transaction):
+    if isinstance(transaction, BankCreditCardTransaction):
+        return io.remove_credit_card_transaction(db, transaction)
+
+
 def update_credit_card_transactions(db, credit_card_number, raw_fetched_transactions):
-    inserted, updated = update_transactions(
+    removed, inserted, updated = update_transactions(
         db,
         TransactionDataclass=BankCreditCardTransaction,
         transaction_grouping_id=credit_card_number,
         transaction_key_fields=['transaction_date', 'amount', 'type.name'],
-        operations=namedtuple('TransactionOperations', 'insert, update, find, find_one, find_matching, count')(
+        operations=namedtuple('TransactionOperations', 'insert, update, find, find_one, find_matching, count, remove')(
             io.insert_credit_card_transaction,
             io.update_credit_card_transaction,
             io.find_credit_card_transactions,
             io.find_one_credit_card_transaction,
             io.find_matching_credit_card_transaction,
             io.count_credit_card_transactions,
+            io.remove_credit_card_transaction
         ),
         raw_fetched_transactions=raw_fetched_transactions
     )
@@ -67,22 +80,23 @@ def update_credit_card_transactions(db, credit_card_number, raw_fetched_transact
             str(duplicated_sequence_found))
         )
 
-    return (inserted, updated)
+    return (removed, inserted, updated)
 
 
 def update_account_transactions(db, account_number, raw_fetched_transactions):
-    inserted, updated = update_transactions(
+    removed, inserted, updated = update_transactions(
         db,
         TransactionDataclass=BankAccountTransaction,
         transaction_grouping_id=account_number,
         transaction_key_fields=['transaction_date', 'amount', 'balance'],
-        operations=namedtuple('TransactionOperations', 'insert, update, find, find_one, find_matching, count')(
+        operations=namedtuple('TransactionOperations', 'insert, update, find, find_one, find_matching, count, remove')(
             io.insert_account_transaction,
             io.update_account_transaction,
             io.find_account_transactions,
             io.find_one_account_transaction,
             io.find_matching_account_transaction,
             io.count_account_transactions,
+            io.remove_account_transaction
         ),
         raw_fetched_transactions=raw_fetched_transactions
     )
@@ -102,7 +116,7 @@ def update_account_transactions(db, account_number, raw_fetched_transactions):
             str(duplicated_sequence_found))
         )
 
-    return (inserted, updated)
+    return (removed, inserted, updated)
 
 
 def update_transactions(db, TransactionDataclass, transaction_grouping_id, transaction_key_fields, operations, raw_fetched_transactions):
@@ -111,6 +125,7 @@ def update_transactions(db, TransactionDataclass, transaction_grouping_id, trans
         return
 
     actions = {
+        'remove': [],
         'insert': [],
         'update': []
     }
@@ -122,9 +137,10 @@ def update_transactions(db, TransactionDataclass, transaction_grouping_id, trans
             yield _transaction
 
     def process_actions():
+        removed = list(map(partial(operations.remove, db), actions['remove']))
         inserted = list(map(partial(operations.insert, db), actions['insert']))
         updated = list(map(partial(operations.update, db), actions['update']))
-        return (len(inserted), len(updated))
+        return (len(removed), len(inserted), len(updated))
 
     fetched_transactions = list(map(
         lambda transaction: TransactionDataclass(**transaction.__dict__),

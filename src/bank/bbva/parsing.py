@@ -346,6 +346,7 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
     is_consolidated = transaction.get('status', {}).get('id') == '7'
 
     notify_not_added = False
+    status_flags = datatypes.StatusFlags()
 
     if is_debit_operation:
         if notify_not_added:
@@ -356,7 +357,7 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
             notifier('Debit transaction found, not adding {bank.name} card transaction: {date} {amount}, {source}->{destination}'.format(
                 bank=bank_config, amount=amount, date=transaction['valueDate'], source=str(source), destination=str(destination))
             )
-        return None
+        status_flags.invalid = True
 
     if not is_consolidated and notify_not_added:
         if notify_not_added:
@@ -382,4 +383,5 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
         details=details,
         keywords=keywords,
         comment=comment if comment is not None else '',
+        status_flags=status_flags
     )
