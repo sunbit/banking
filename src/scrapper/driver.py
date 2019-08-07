@@ -140,8 +140,14 @@ def new(*args, **kwargs):
     chrome_options.add_argument("--window-size=1920x800")
     if headless:
         chrome_options.add_argument("--headless")
-        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-impl-side-painting")
+        chrome_options.add_argument("--disable-gpu-sandbox")
+        chrome_options.add_argument("--disable-accelerated-2d-canvas")
+        chrome_options.add_argument("--disable-accelerated-jpeg-decoding")
 
     _driver = webdriver.Chrome(*args, chrome_options=chrome_options, **kwargs)
 
