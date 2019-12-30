@@ -74,6 +74,7 @@ class AccountConfig:
     id: str
     cards: list
 
+
 @dataclass
 class LocalAccountConfig:
     type: str
@@ -141,6 +142,7 @@ class LocalAccount(TransactionSubject):
             account_config.id
         )
 
+
 @dataclass
 class Card(TransactionSubject):
     number: str
@@ -174,11 +176,13 @@ class Category():
     name: str
     parent: str = None
 
+
 @dataclass
 class RelatedTransaction():
     account_type: str
     account_id: str
     transaction_id: str
+
 
 @dataclass
 class ModifiedFlags():
@@ -190,9 +194,11 @@ class ModifiedFlags():
     tags: int = DataOrigin.ORIGINAL
     category: int = DataOrigin.ORIGINAL
 
+
 @dataclass
 class StatusFlags():
     invalid: bool = False
+    valid_duplicate: bool = False
 
 
 @dataclass
@@ -235,6 +241,7 @@ class ParsedCreditCardTransaction():
     status_flags: StatusFlags = field(default_factory=StatusFlags)
     category: str = None
     tags: list = field(default_factory=list)
+
 
 @dataclass
 class BankCreditCardTransaction():
@@ -286,6 +293,7 @@ class BankAccountTransaction():
     _id: str = None
     _seq: int = None
 
+
 @dataclass
 class LocalAccountTransaction():
     type: TransactionType
@@ -307,6 +315,7 @@ class LocalAccountTransaction():
     offset: RelatedTransaction = None
     _id: str = None
     _seq: int = None
+
 
 DATACLASSES = list(filter(lambda obj: is_dataclass(obj), locals().values()))
 ENUMS = list(filter(lambda obj: isinstance(obj, EnumMeta), locals().values()))

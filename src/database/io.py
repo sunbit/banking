@@ -186,20 +186,23 @@ def insert_local_account_transaction(db, transaction):
 
 def find_matching_account_transaction(db, account_number, transaction):
     collection = db.account_transactions
-    results = list(collection.find(
-        {
-            'account.id': account_number,
-            'transaction_date.date': encode_date(transaction.transaction_date),
-            # This has been added to avoid same day, same amount, same balance multiple matches
-            # when they are legitimate (i.e. buy, return, buy same thing again, all the same day)
-            # but it will fail again as the value date use case may be only aplicable to the example found.
-            # The real problem is not having id's and hour, minute, second information on bankia transactions
-            'value_date.date': encode_date(transaction.value_date),
-            'amount': transaction.amount,
-            'balance': transaction.balance
-        },
-        sort=[('_seq', 1)]
-    ))
+    results = list(
+        filter(
+            lambda transaction: not transaction.status_flags.valid_duplicate,
+            map(
+                decode_object,
+                collection.find(
+                    {
+                        'account.id': account_number,
+                        'transaction_date.date': encode_date(transaction.transaction_date),
+                        'amount': transaction.amount,
+                        'balance': transaction.balance
+                    },
+                    sort=[('_seq', 1)]
+                )
+            )
+        )
+    )
 
     if not results:
         return None
@@ -278,20 +281,23 @@ def update_account_transaction(db, transaction):
 
 def find_matching_credit_card_transaction(db, credit_card_number, transaction):
     collection = db.credit_card_transactions
-    results = list(collection.find(
-        {
-            'card.number': credit_card_number,
-            'transaction_date.date': encode_date(transaction.transaction_date),
-            # This has been added to avoid same day, same amount, same balance multiple matches
-            # when they are legitimate (i.e. buy, return, buy same thing again, all the same day)
-            # but it will fail again as the value date use case may be only aplicable to the example found.
-            # The real problem is not having id's and hour, minute, second information on bankia transactions
-            'value_date.date': encode_date(transaction.value_date),
-            'amount': transaction.amount,
-            'transaction_id': transaction.transaction_id
-        },
-        sort=[('_seq', 1)]
-    ))
+    results = list(
+        filter(
+            lambda transaction: not transaction.status_flags.valid_duplicate,
+            map(
+                decode_object,
+                collection.find(
+                    {
+                        'account.id': credit_card_number,
+                        'transaction_date.date': encode_date(transaction.transaction_date),
+                        'amount': transaction.amount,
+                        'transaction_id': transaction.transaction_id
+                    },
+                    sort=[('_seq', 1)]
+                )
+            )
+        )
+    )
 
     if not results:
         return None
