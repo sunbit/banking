@@ -68,7 +68,7 @@ def update_credit_card_transactions(db, credit_card_number, raw_fetched_transact
         db,
         TransactionDataclass=BankCreditCardTransaction,
         transaction_grouping_id=credit_card_number,
-        transaction_key_fields=['transaction_date', 'amount', 'type.name'],
+        transaction_key_fields=['transaction_date', 'value_date', 'amount', 'type.name'],
         operations=namedtuple('TransactionOperations', 'insert, update, find, find_one, find_matching, count, remove')(
             io.insert_credit_card_transaction,
             io.update_credit_card_transaction,
@@ -96,7 +96,7 @@ def update_account_transactions(db, account_number, raw_fetched_transactions):
         db,
         TransactionDataclass=BankAccountTransaction,
         transaction_grouping_id=account_number,
-        transaction_key_fields=['transaction_date', 'amount', 'balance'],
+        transaction_key_fields=['transaction_date', 'value_date', 'amount', 'balance'],
         operations=namedtuple('TransactionOperations', 'insert, update, find, find_one, find_matching, count, remove')(
             io.insert_account_transaction,
             io.update_account_transaction,

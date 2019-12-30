@@ -190,6 +190,11 @@ def find_matching_account_transaction(db, account_number, transaction):
         {
             'account.id': account_number,
             'transaction_date.date': encode_date(transaction.transaction_date),
+            # This has been added to avoid same day, same amount, same balance multiple matches
+            # when they are legitimate (i.e. buy, return, buy same thing again, all the same day)
+            # but it will fail again as the value date use case may be only aplicable to the example found.
+            # The real problem is not having id's and hour, minute, second information on bankia transactions
+            'value_date.date': encode_date(transaction.value_date),
             'amount': transaction.amount,
             'balance': transaction.balance
         },
@@ -200,7 +205,10 @@ def find_matching_account_transaction(db, account_number, transaction):
         return None
 
     if len(results) > 1:
-        raise DatabaseError('Found more than one match for a transaction, check the algorithm')
+        raise DatabaseError('Found more than one match for a transaction, check the algorithm [{date} {amount}]'.format(
+            date=encode_date(transaction.transaction_date),
+            amount=transaction.amount
+        ))
 
     return decode_object(results[0])
 
@@ -274,6 +282,11 @@ def find_matching_credit_card_transaction(db, credit_card_number, transaction):
         {
             'card.number': credit_card_number,
             'transaction_date.date': encode_date(transaction.transaction_date),
+            # This has been added to avoid same day, same amount, same balance multiple matches
+            # when they are legitimate (i.e. buy, return, buy same thing again, all the same day)
+            # but it will fail again as the value date use case may be only aplicable to the example found.
+            # The real problem is not having id's and hour, minute, second information on bankia transactions
+            'value_date.date': encode_date(transaction.value_date),
             'amount': transaction.amount,
             'transaction_id': transaction.transaction_id
         },
