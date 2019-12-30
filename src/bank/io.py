@@ -50,4 +50,5 @@ def decode_notifications(notifications_config):
 def decode_scheduler_configuration(scheduler_config):
     return SchedulerConfig(
         scheduler_config['scrapping_hours'],
+        scheduler_config['update_timeout_seconds'],
     )

@@ -38,6 +38,7 @@ class NotificationsConfig:
 @dataclass
 class SchedulerConfig:
     scrapping_hours: list
+    update_timeout_seconds: int
 
 
 @dataclass

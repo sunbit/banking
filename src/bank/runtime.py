@@ -1,8 +1,10 @@
 import importlib
+import json
 import traceback
 import yaml
 import os
 
+from copy import deepcopy
 from datetime import datetime
 from functools import partial
 from dateutil.relativedelta import relativedelta
@@ -11,7 +13,7 @@ from .io import decode_bank, decode_card, decode_account, decode_local_account, 
 from datatypes import Configuration, Category
 from common.logging import get_logger
 from common.notifications import get_notifier
-from common.utils import parse_bool, traceback_summary
+from common.utils import parse_bool, traceback_summary, get_nested_item
 
 
 import scrapper
@@ -26,6 +28,7 @@ def env():
     return {
         'database_folder': os.getenv('BANKING_DATABASE_FOLDER', './database'),
         'main_config_file': os.getenv('BANKING_CONFIG_FILE', './banking.yaml'),
+        'metadata_file': os.getenv('BANKING_METADATA_FILE', './metadata.yaml'),
         'categories_file': os.getenv('BANKING_CATEGORIES_FILE', './categories.yaml'),
         'headless_browser': parse_bool(os.getenv('BANKING_HEADLESS_BROWSER', True)),
         'close_browser': parse_bool(os.getenv('BANKING_CLOSE_BROWSER', True)),
@@ -246,13 +249,75 @@ EXCEPTION_MESSAGE = """While updating *{bank.name}* {source} *{id}* transactions
 """
 
 
+def get_metadata(metadata_filename):
+    if not os.path.exists(metadata_filename):
+        return {}
+
+    with open(metadata_filename) as metadata_file:
+        metadata = yaml.load(metadata_file, Loader=yaml.FullLoader)
+
+    return metadata
+
+
+def save_metadata(metadata_filename, metadata):
+    with open(metadata_filename, 'w') as metadata_file:
+        yaml.dump(metadata, metadata_file)
+
+
+def get_last_update_time(metadata, bank, account_type, identifier):
+    return get_nested_item(metadata, '{}.{}.{}.updated'.format(bank, account_type, identifier))
+
+
+def set_last_update_time(metadata, bank, account_type, identifier, date):
+    _metadata = deepcopy(metadata)
+    bank_level = _metadata.setdefault(bank, {})
+    type_level = bank_level.setdefault(account_type, {})
+    account_level = type_level.setdefault(identifier, {})
+    account_level['updated'] = date
+    return _metadata
+
+
 def update_all(banking_config, env):
     success = []
     failure = []
 
     db = database.load(env['database_folder'])
+    metadata_file = env['metadata_file']
+    min_updated_elapsed = banking_config.scheduler.update_timeout_seconds
+
+    def already_updated(bank_id, account_type, account_number):
+        last_update = get_last_update_time(
+            get_metadata(metadata_file),
+            bank_id, 'account', account_number
+        )
+        if last_update is None:
+            return False
+
+        elapsed = (datetime.utcnow() - last_update).seconds
+        elapsed_hours = int(elapsed / 3600)
+        elapsed_minutes = elapsed - (elapsed_hours * 3600)
+        if elapsed < min_updated_elapsed:
+            logger.warning(
+                "Canceling update of {} {} {} as it was updated already {}h:{}m ago".format(
+                    bank_id, account_type, account_number, elapsed_hours, elapsed_minutes
+                )
+            )
+            return True
+        else:
+            return False
+
+    def update_last_update_time(bank_id, account_type, account_number):
+        save_metadata(
+            metadata_file,
+            set_last_update_time(get_metadata(metadata_file), bank_id, account_type, account_number, datetime.utcnow())
+        )
+
     for bank_id, bank in banking_config.banks.items():
         for account_number, account in bank.accounts.items():
+
+            if already_updated(bank_id, 'account', account_number):
+                continue
+
             try:
                 last_transaction_date = database.last_account_transaction_date(db, account.id)
                 if last_transaction_date is None:
@@ -278,6 +343,9 @@ def update_all(banking_config, env):
                         account=account,
                         removed=removed
                     ))
+
+                update_last_update_time(bank_id, 'account', account_number)
+
             except database.DivergedHistoryError as exc:
                 failure.append(EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=exc.message))
                 logger.error(exc.message)
@@ -293,6 +361,10 @@ def update_all(banking_config, env):
 
     for card_number, card in banking_config.cards.items():
         if card.type == 'credit' and card.active:
+
+            if already_updated(banking_config.accounts[card.account_number].bank_id, 'card', card_number):
+                continue
+
             try:
                 last_transaction_date = database.last_credit_card_transaction_date(db, card.number)
                 if last_transaction_date is None:
@@ -321,6 +393,9 @@ def update_all(banking_config, env):
                         card=card,
                         removed=removed
                     ))
+
+                update_last_update_time(bank_id, 'account', account_number)
+
             except database.DivergedHistoryError as exc:
                 failure.append(EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=exc.message))
                 logger.error(exc.message)
