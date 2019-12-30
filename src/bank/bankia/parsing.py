@@ -274,7 +274,7 @@ def get_comment(details, transaction_type):
 
 def decode_date(date, hour=None):
     year, month, day = date.split('T')[0].split('-')
-    hour, minute, second = (0, 0, 0) if hour is None else hour.split(':')
+    hour, minute, second = (0, 0, 0) if hour is None else hour.replace('.', ':').split(':')
     return datetime(*map(int, [year, month, day, hour, minute, second]))
 
 
