@@ -28,7 +28,8 @@ def env():
         'main_config_file': os.getenv('BANKING_CONFIG_FILE', './banking.yaml'),
         'categories_file': os.getenv('BANKING_CATEGORIES_FILE', './categories.yaml'),
         'headless_browser': parse_bool(os.getenv('BANKING_HEADLESS_BROWSER', True)),
-
+        'close_browser': parse_bool(os.getenv('BANKING_CLOSE_BROWSER', True)),
+        'update_accounts_on_start': parse_bool(os.getenv('BANKING_UPDATE_ACCOUNTS_ON_START', True)),
     }
 
 
@@ -142,8 +143,11 @@ def scrap_bank_account_transactions(bank_module, bank_config, account_config, fr
         from_date,
         to_date
     )
-    browser.close()
-    browser.quit()
+
+    if env()['close_browser']:
+        browser.close()
+        browser.quit()
+
     return transactions
 
 
@@ -156,8 +160,11 @@ def scrap_bank_credit_card_transactions(bank_module, bank_config, card_config, f
         from_date,
         to_date
     )
-    browser.close()
-    browser.quit()
+
+    if env()['close_browser']:
+        browser.close()
+        browser.quit()
+
     return transactions
 
 
@@ -234,7 +241,7 @@ def update_bank_credit_card_transactions(db, bank_config, account_config, card_c
 EXCEPTION_MESSAGE = """While updating *{bank.name}* {source} *{id}* transactions the following error occurred:
 
 ```
-{traceback}
+{message}
 ```
 """
 
@@ -281,7 +288,7 @@ def update_all(banking_config, env):
                 failure.append(EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
                 logger.error(exc.message)
             except Exception as exc:
-                failure.append(EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, traceback=traceback.format_exc()))
+                failure.append(EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=traceback.format_exc()))
                 logger.error(traceback_summary(traceback.format_exc(), exc))
 
     for card_number, card in banking_config.cards.items():
@@ -327,7 +334,7 @@ def update_all(banking_config, env):
                 failure.append(EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))
                 logger.error(exc.message)
             except Exception as exc:
-                failure.append(EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, traceback=traceback.format_exc()))
+                failure.append(EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=traceback.format_exc()))
                 logger.error(traceback_summary(traceback.format_exc(), exc))
 
     notifier = get_notifier(banking_config.notifications)

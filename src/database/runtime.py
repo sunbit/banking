@@ -4,16 +4,24 @@ from tinymongo import TinyMongoClient
 
 from . import io
 from datatypes import BankAccountTransaction, BankCreditCardTransaction, LocalAccountTransaction
-from datatypes import LocalAccount, Card
+from datatypes import LocalAccount, Card, AccessCode
 
 from collections import namedtuple
-from functools import partial
 
 
 def load(database_folder):
     connection = TinyMongoClient(database_folder)
     db = getattr(connection, 'banking')
     return db
+
+
+def get_account_access_code(db, account):
+    code = io.get_account_access_code(db, account.id)
+    return code
+
+
+def update_account_access_code(db, account, access_code):
+    return io.update_account_access_code(db, account.id, access_code)
 
 
 def last_account_transaction_date(db, account_number):

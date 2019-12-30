@@ -27,6 +27,10 @@ class ScrappingError(Exception):
 """
 
 
+class SMSOTPException(Exception):
+    pass
+
+
 class ParsingError(Exception):
     pass
 

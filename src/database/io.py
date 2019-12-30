@@ -49,7 +49,7 @@ def encode_date(dt):
     return dt.strftime('%Y-%m-%dT%H:%M:%S')
 
 
-def encode_transaction(parsed_transaction):
+def encode_object(domain_object):
     def encode(obj):
         if is_dataclass(obj):
             encoded = obj.__dict__
@@ -84,10 +84,10 @@ def encode_transaction(parsed_transaction):
         else:
             return encoded
 
-    return recurse(parsed_transaction)
+    return recurse(domain_object)
 
 
-def decode_transaction(document):
+def decode_object(document):
 
     if document is None:
         return None
@@ -137,6 +137,27 @@ def decode_transaction(document):
     return decoded
 
 
+def get_account_access_code(db, account_number):
+    collection = db.account_access_codes
+    # In reality this cache problem here is a lack of locking that
+    # makes this break when we are continuously querying for access code, and a new code is deleted
+    # and inserted, and the empty db after the delte is cached, but not the insertion.
+    # maybe trying with the newest tinydb, or the tinyrecord extension.
+    try:
+        collection.table.clear_cache()
+    except AttributeError:
+        pass
+
+    results = list(collection.find({"account_id": account_number}))
+    return decode_object(results[0]) if results else None
+
+
+def update_account_access_code(db, account_number, access_code):
+    collection = db.account_access_codes
+    collection.remove({"account_id": account_number})
+    return collection.insert_one(encode_object(access_code))
+
+
 def find_local_account_transactions(db, account_id=None, since_date=None, sort_direction=SortDirection.NEWEST_TRANSACTION_LAST):
     collection = db.local_account_transactions
     query = {}
@@ -148,7 +169,7 @@ def find_local_account_transactions(db, account_id=None, since_date=None, sort_d
         query['transaction_date.date'] = {'$gte': encode_date(since_date)}
 
     results = list(map(
-        decode_transaction,
+        decode_object,
         collection.find(
             query,
             sort=[('_seq', sort_direction.value)]
@@ -160,7 +181,7 @@ def find_local_account_transactions(db, account_id=None, since_date=None, sort_d
 
 def insert_local_account_transaction(db, transaction):
     collection = db.local_account_transactions
-    return collection.insert_one(encode_transaction(transaction))
+    return collection.insert_one(encode_object(transaction))
 
 
 def find_matching_account_transaction(db, account_number, transaction):
@@ -181,7 +202,7 @@ def find_matching_account_transaction(db, account_number, transaction):
     if len(results) > 1:
         raise DatabaseError('Found more than one match for a transaction, check the algorithm')
 
-    return decode_transaction(results[0])
+    return decode_object(results[0])
 
 
 def find_one_account_transaction(db, account_number, sort_seq=1):
@@ -196,7 +217,7 @@ def find_one_account_transaction(db, account_number, sort_seq=1):
     if not results:
         return None
 
-    return decode_transaction(results[0])
+    return decode_object(results[0])
 
 
 def find_account_transactions(db, account_number=None, since_seq_number=None, since_date=None, sort_field='_seq', sort_direction=1):
@@ -213,7 +234,7 @@ def find_account_transactions(db, account_number=None, since_seq_number=None, si
         query['transaction_date.date'] = {'$gte': encode_date(since_date)}
 
     results = list(map(
-        decode_transaction,
+        decode_object,
         collection.find(
             query,
             sort=[(sort_field, sort_direction)]
@@ -232,7 +253,7 @@ def remove_account_transaction(db, transaction):
 
 def insert_account_transaction(db, transaction):
     collection = db.account_transactions
-    return collection.insert_one(encode_transaction(transaction))
+    return collection.insert_one(encode_object(transaction))
 
 
 def count_account_transactions(db, account_number):
@@ -244,7 +265,7 @@ def count_account_transactions(db, account_number):
 
 def update_account_transaction(db, transaction):
     collection = db.account_transactions
-    return collection.update({'_id': transaction._id}, encode_transaction(transaction))
+    return collection.update({'_id': transaction._id}, encode_object(transaction))
 
 
 def find_matching_credit_card_transaction(db, credit_card_number, transaction):
@@ -268,7 +289,7 @@ def find_matching_credit_card_transaction(db, credit_card_number, transaction):
             amount=transaction.amount
         ))
 
-    return decode_transaction(results[0])
+    return decode_object(results[0])
 
 
 def find_one_credit_card_transaction(db, credit_card_number, sort_seq=1):
@@ -283,7 +304,7 @@ def find_one_credit_card_transaction(db, credit_card_number, sort_seq=1):
     if not results:
         return None
 
-    return decode_transaction(results[0])
+    return decode_object(results[0])
 
 
 def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=None, since_date=None, _seq=None, sort_field='_seq', sort_direction=1):
@@ -303,7 +324,7 @@ def find_credit_card_transactions(db, credit_card_number=None, since_seq_number=
         query['transaction_date.date'] = {'$gte': encode_date(since_date)}
 
     results = list(map(
-        decode_transaction,
+        decode_object,
         collection.find(
             query,
             sort=[(sort_field, sort_direction)]
@@ -322,7 +343,7 @@ def remove_credit_card_transaction(db, transaction):
 
 def insert_credit_card_transaction(db, transaction):
     collection = db.credit_card_transactions
-    return collection.insert_one(encode_transaction(transaction))
+    return collection.insert_one(encode_object(transaction))
 
 
 def count_credit_card_transactions(db, credit_card_number):
@@ -334,7 +355,7 @@ def count_credit_card_transactions(db, credit_card_number):
 
 def update_credit_card_transaction(db, transaction):
     collection = db.credit_card_transactions
-    return collection.update({'_id': transaction._id}, encode_transaction(transaction))
+    return collection.update({'_id': transaction._id}, encode_object(transaction))
 
 
 def align_decimal(number):
@@ -347,11 +368,11 @@ def align_decimal(number):
 
 
 # def log_action(transaction, action):
-    print('> {action:2}  {m._seq:02}  {m.transaction_date}  {amount} '.format(
-        m=transaction,
-        action=action,
-        amount=align_decimal(transaction.amount)
-    ))
+    # print('> {action:2}  {m._seq:02}  {m.transaction_date}  {amount} '.format(
+    #     m=transaction,
+    #     action=action,
+    #     amount=align_decimal(transaction.amount)
+    # ))
 
 
 def check_balance_consistency(db, account_number):

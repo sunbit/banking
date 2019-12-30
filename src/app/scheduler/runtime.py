@@ -48,4 +48,5 @@ def run(config):
     _thread.start_new_thread(schedule_loop, ())
 
     # Run the scrapping job once, non blocking
-    run_once(execute_update_all, 'Update all transactions from banks')
+    if bank.env()['update_accounts_on_start']:
+        run_once(execute_update_all, 'Update all transactions from banks')

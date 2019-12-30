@@ -41,6 +41,14 @@ class SchedulerConfig:
 
 
 @dataclass
+class AccessCode:
+    account_id: str
+    code: str
+    date: str
+    _id: str = None
+
+
+@dataclass
 class Configuration:
     banks: dict
     accounts: dict
@@ -120,6 +128,7 @@ class Account(TransactionSubject):
             account_config.name,
             account_config.id
         )
+
 
 @dataclass
 class LocalAccount(TransactionSubject):

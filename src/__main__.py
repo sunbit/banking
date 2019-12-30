@@ -9,14 +9,14 @@ Usage:
   banking remove <bank> (account|card) transaction <seq> [options]
   banking apply rules
   banking load <bank> (account|card) raw transactions <raw-filename> [options]
-  banking run server
+  banking run server [options]
   banking (-h | --help)
   banking --version
 
 Options:
   -h --help              Show this screen.
   --version              Show version.
-  --filter=<filters>  Filter table by visible text
+  --filter=<filters>     Filter table by visible text
   --from=<from-date>     Query start date
   --to=<to-date>         Query to date
   --save=<filename>      Save the scrapped transactions in raw format to a json file
@@ -24,6 +24,7 @@ Options:
   --debug-browser        Shows the selenium task in a browser
   --keep-browser-open    Prevent to close the selenium browser after a crash
   --use-cache            Use cached raw transactions if any
+  --no-initial-update    When running the server, don't run the initial scheduler
 
 """
 
@@ -183,6 +184,14 @@ if __name__ == '__main__':
     load_raw = arguments['raw']
     load_all = arguments['all']
 
+    headless = not arguments['--debug-browser']
+    close_browser = not arguments['--keep-browser-open']
+    update_accounts_on_start = not arguments['--no-initial-update']
+
+    os.environ["BANKING_HEADLESS_BROWSER"] = str(headless)
+    os.environ["BANKING_CLOSE_BROWSER"] = str(close_browser)
+    os.environ["BANKING_UPDATE_ACCOUNTS_ON_START"] = str(update_accounts_on_start)
+
     if action == "run" and arguments['server']:
         app.run(banking_configuration)
         sys.exit(0)
@@ -219,8 +228,6 @@ if __name__ == '__main__':
         sys.exit(1)
 
     bank_id = arguments['<bank>']
-    headless = not arguments['--debug-browser']
-    close_browser = not arguments['--keep-browser-open']
 
     if action in ['get', 'update']:
         try:
@@ -284,7 +291,8 @@ if __name__ == '__main__':
             print(exc.message)
             sys.exit(1)
         except exceptions.SomethingChangedError as exc:
-            print(exc.message)
+            print("Somthing has changed: ", exc.message)
+            input()
             sys.exit(1)
         except Exception:
             print(traceback.format_exc())

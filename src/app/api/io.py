@@ -15,11 +15,10 @@ def encode_account(account_config, include_children=True):
     return account
 
 
-def encode_transaction(transaction):
+def encode_object(obj):
     def encode(obj):
         if is_dataclass(obj):
             encoded = obj.__dict__
-            encoded['__type__'] = 'dataclass::{}'.format(obj.__class__.__name__)
             return encoded
         elif isinstance(obj, Enum):
             return {
@@ -27,10 +26,7 @@ def encode_transaction(transaction):
                 'name': obj.name
             }
         elif isinstance(obj, datetime):
-            return {
-                '__type__': 'datetime',
-                'date': encode_date(obj)
-            }
+            return encode_date(obj)
         else:
             return obj
 
@@ -50,4 +46,4 @@ def encode_transaction(transaction):
         else:
             return encoded
 
-    return recurse(transaction)
+    return recurse(obj)

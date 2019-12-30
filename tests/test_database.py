@@ -1,6 +1,6 @@
 from database.runtime import update_credit_card_transactions
 from datatypes import TransactionType
-from database.io import decode_transaction
+from database.io import decode_object
 from .helpers import make_credit_card_transaction, make_test_account, make_test_card
 from copy import deepcopy
 from datetime import datetime
@@ -398,7 +398,7 @@ def test_database_update_success(db_from_transactions, current_db_transactions, 
     update_credit_card_transactions(db, TEST_CREDIT_CARD_NUMBER, fetched_transactions)
 
     stored_db_transactions = list(map(
-        decode_transaction,
+        decode_object,
         db.credit_card_transactions.find(
             {'card.number': TEST_CREDIT_CARD_NUMBER},
             sort=[('_seq', 1)]
@@ -422,7 +422,7 @@ def test_database_update_failures(db_from_transactions, current_db_transactions,
         update_credit_card_transactions(db, TEST_CREDIT_CARD_NUMBER, fetched_transactions)
 
     stored_db_transactions = list(map(
-        decode_transaction,
+        decode_object,
         db.credit_card_transactions.find(
             {'card.number': TEST_CREDIT_CARD_NUMBER},
             sort=[('_seq', 1)]
