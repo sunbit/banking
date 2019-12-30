@@ -320,6 +320,10 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
     transation_direction = TransactionDirection.CHARGE if amount < 0 else TransactionDirection.INCOME
     transaction_type = get_type(transaction_code, transation_direction)
 
+    # Transactions have a _PT or _TT termination, that changes once over time and makes id unusable
+    # this is an attempt to fix this and still being able to use the id as an unique id
+    transaction_id = re.sub(r'_[PT]T$', '', transaction['id'])
+
     details = get_card_transaction_details(transaction, transaction_type)
     details['account'] = Account.from_config(account_config)
     details['bank'] = Bank.from_config(bank_config)
@@ -371,7 +375,7 @@ def parse_credit_card_transaction(bank_config, account_config, card_config, tran
         return None
 
     return ParsedCreditCardTransaction(
-        transaction_id=transaction['id'],
+        transaction_id=transaction_id,
         type=transaction_type,
         currency=transaction['amount']['currency']['code'],
         amount=amount,

@@ -156,6 +156,7 @@ def update_transactions(db, TransactionDataclass, transaction_grouping_id, trans
     ))
 
     # First use case: All fetched transactions are new
+    # (in other words, we don't have any stored transaction yet)
 
     transaction_count = operations.count(db, transaction_grouping_id)
     if transaction_count == 0:
