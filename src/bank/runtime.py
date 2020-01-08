@@ -353,7 +353,7 @@ def update_all(banking_config, env):
                 failure.append(EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
                 logger.error(str(exc))
             except (exceptions.SomethingChangedError, exceptions.InteractionError) as exc:
-                failure.append(EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc)))
+                failure.append(EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=str(exc.message)))
                 logger.error(exc.message)
             except Exception as exc:
                 failure.append(EXCEPTION_MESSAGE.format(bank=bank, source='account', id=account.id, message=traceback.format_exc()))
@@ -403,7 +403,7 @@ def update_all(banking_config, env):
                 failure.append(EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))
                 logger.error(str(exc))
             except (exceptions.SomethingChangedError, exceptions.InteractionError) as exc:
-                failure.append(EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))
+                failure.append(EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc.message)))
                 logger.error(exc.message)
             except (exceptions.ParsingError) as exc:
                 failure.append(EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=str(exc)))

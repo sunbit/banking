@@ -86,15 +86,6 @@ def login(browser, username, password):
     log('Submitting login')
     browser.find_element_by_css_selector("button[type=submit]").click()
 
-    # Close popup if any
-    log('Waiting for popups to close them')
-    modal_close_button = browser.find_element_by_css_selector('#ui-dialog-campania-bloqueante #noInteresa', timeout=15, do_raise=False)
-    if modal_close_button:
-        modal_close_button.forced_click()
-        log('Popup closed')
-    else:
-        log('No popups found')
-
     # Fill SMS OTP if any
     log('Waiting for code request, if any')
     code_request_input = browser.find_element_by_css_selector('input[name=otp][type=password]', visible=True, timeout=15, do_raise=False)
@@ -133,8 +124,14 @@ def login(browser, username, password):
     else:
         log('No code requested or already entered recently')
 
-
-
+    # Close popup if any
+    log('Waiting for popups to close them')
+    modal_close_button = browser.find_element_by_css_selector('#ui-dialog-campania-bloqueante #noInteresa', timeout=15, do_raise=False)
+    if modal_close_button:
+        modal_close_button.forced_click()
+        log('Popup closed')
+    else:
+        log('No popups found')
 
     log('Waiting login to finish')
     browser.find_element_by_css_selector('#t-main-content', visible=True, timeout=20)
