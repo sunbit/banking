@@ -30,7 +30,7 @@ def get_type(transaction_code, transaction_direction):
 
     PAYCHECK = ['105']
     TRANSFER_CODES = ['163', '203', '603', '673']
-    BANK_COMISSION_CODES = ['205', '275', '578']
+    BANK_COMISSION_CODES = ['205', '275', '578', '751', '423']
     RECEIPT_CODES = ['253', '257', '261']
     MORTAGE_RECEIPT = ['255']
     CREDIT_CARD_INVOICE = ['274', '400']
@@ -323,11 +323,25 @@ def parse_account_transaction(bank_config, account_config, transaction):
     )
 
 
+def infer_transaction_direction(transaction_code):
+    return {
+        '400': TransactionDirection.INCOME,
+        '800': TransactionDirection.CHARGE,
+        '751': TransactionDirection.CHARGE,
+        '423': TransactionDirection.INCOME,
+    }[transaction_code]
+
+
 def parse_credit_card_transaction(bank_config, account_config, card_config, transaction):
 
     amount = decode_numeric_value(transaction['importeMovimiento'])
     transaction_code = transaction['claveMovimiento']
-    transaction_direction = TransactionDirection.CHARGE if amount < 0 else TransactionDirection.INCOME
+    # FUCK BANKIA, removed sign from values
+    # transaction_direction = TransactionDirection.CHARGE if amount < 0 else TransactionDirection.INCOME
+    transaction_direction = infer_transaction_direction(transaction_code)
+    if transaction_direction is TransactionDirection.CHARGE:
+        amount = amount * -1
+
     transaction_type = get_type(transaction_code, transaction_direction)
 
     details = get_card_transaction_details(transaction, transaction_type)

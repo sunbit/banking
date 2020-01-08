@@ -152,6 +152,27 @@ def get_account_access_code(db, account_number):
     return decode_object(results[0]) if results else None
 
 
+def get_bank_access_code(db, bank_id):
+    collection = db.bank_access_codes
+    # In reality this cache problem here is a lack of locking that
+    # makes this break when we are continuously querying for access code, and a new code is deleted
+    # and inserted, and the empty db after the delte is cached, but not the insertion.
+    # maybe trying with the newest tinydb, or the tinyrecord extension.
+    try:
+        collection.table.clear_cache()
+    except AttributeError:
+        pass
+
+    results = list(collection.find({"bank_id": bank_id}))
+    return decode_object(results[0]) if results else None
+
+
+def update_bank_access_code(db, bank_id, access_code):
+    collection = db.bank_access_codes
+    collection.remove({"bank_id": bank_id})
+    return collection.insert_one(encode_object(access_code))
+
+
 def update_account_access_code(db, account_number, access_code):
     collection = db.account_access_codes
     collection.remove({"account_id": account_number})
@@ -288,7 +309,7 @@ def find_matching_credit_card_transaction(db, credit_card_number, transaction):
                 decode_object,
                 collection.find(
                     {
-                        'account.id': credit_card_number,
+                        'card.number': credit_card_number,
                         'transaction_date.date': encode_date(transaction.transaction_date),
                         'amount': transaction.amount,
                         'transaction_id': transaction.transaction_id
@@ -386,12 +407,13 @@ def align_decimal(number):
     return aligned
 
 
-# def log_action(transaction, action):
+def log_action(transaction, action):
     # print('> {action:2}  {m._seq:02}  {m.transaction_date}  {amount} '.format(
     #     m=transaction,
     #     action=action,
     #     amount=align_decimal(transaction.amount)
     # ))
+    pass
 
 
 def check_balance_consistency(db, account_number):
@@ -513,7 +535,7 @@ def select_new_transactions(fetched_transactions, db_transactions, transaction_k
             yield ('insert', new_transaction)
             next_seq_number += 1
             sequence_change_needed = True
-            # log_action(new_transaction, '+')
+            log_action(new_transaction, '+')
 
         elif action == ' ' and not sequence_change_needed:
             # this transaction is on both db and fetched transactions
@@ -521,7 +543,7 @@ def select_new_transactions(fetched_transactions, db_transactions, transaction_k
             # be used if we have new fetched transactions at the tail
             # or we need to cascade change sequence numbers
             next_seq_number = db_transactions_by_hash[transaction_hash]._seq + 1
-            # log_action(db_transactions_by_hash[transaction_hash], 's')
+            log_action(db_transactions_by_hash[transaction_hash], 's')
 
         elif sequence_change_needed and action == ' ':
             # this transaction is on both db and fetched transactions but we inserted
@@ -531,7 +553,7 @@ def select_new_transactions(fetched_transactions, db_transactions, transaction_k
             updated_transaction._seq = next_seq_number
             yield ('update', updated_transaction)
             next_seq_number += 1
-            # log_action(updated_transaction, 'u')
+            log_action(updated_transaction, 'u')
 
         elif action == '-' and all_fetched_processed and sequence_change_needed:
             # this transaction is only on db but as something happened
@@ -541,12 +563,12 @@ def select_new_transactions(fetched_transactions, db_transactions, transaction_k
             updated_transaction._seq = next_seq_number
             yield ('update', updated_transaction)
             next_seq_number += 1
-            # log_action(updated_transaction, 'u-')
+            log_action(updated_transaction, 'u-')
 
         elif action == '-' and all_fetched_processed and not sequence_change_needed:
             # This will never happen, as the last conditional in the loop breaks it
             # the as soon as all fetched items are processed
-            # log_action(fetched_transaction, '?')
+            log_action(fetched_transaction, '?')
             pass
 
         elif action == '-' and not all_fetched_processed:

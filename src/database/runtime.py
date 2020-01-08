@@ -4,7 +4,7 @@ from tinymongo import TinyMongoClient
 
 from . import io
 from datatypes import BankAccountTransaction, BankCreditCardTransaction, LocalAccountTransaction
-from datatypes import LocalAccount, Card, AccessCode
+from datatypes import LocalAccount, Card
 
 from collections import namedtuple
 
@@ -22,6 +22,15 @@ def get_account_access_code(db, account):
 
 def update_account_access_code(db, account, access_code):
     return io.update_account_access_code(db, account.id, access_code)
+
+
+def get_bank_access_code(db, bank_config):
+    code = io.get_bank_access_code(db, bank_config.id)
+    return code
+
+
+def update_bank_access_code(db, bank_config, access_code):
+    return io.update_bank_access_code(db, bank_config.id, access_code)
 
 
 def last_account_transaction_date(db, account_number):
@@ -68,7 +77,7 @@ def update_credit_card_transactions(db, credit_card_number, raw_fetched_transact
         db,
         TransactionDataclass=BankCreditCardTransaction,
         transaction_grouping_id=credit_card_number,
-        transaction_key_fields=['transaction_date', 'value_date', 'amount', 'type.name'],
+        transaction_key_fields=['transaction_date', 'amount', 'type.name'],
         operations=namedtuple('TransactionOperations', 'insert, update, find, find_one, find_matching, count, remove')(
             io.insert_credit_card_transaction,
             io.update_credit_card_transaction,
@@ -96,7 +105,7 @@ def update_account_transactions(db, account_number, raw_fetched_transactions):
         db,
         TransactionDataclass=BankAccountTransaction,
         transaction_grouping_id=account_number,
-        transaction_key_fields=['transaction_date', 'value_date', 'amount', 'balance'],
+        transaction_key_fields=['transaction_date', 'amount', 'balance'],
         operations=namedtuple('TransactionOperations', 'insert, update, find, find_one, find_matching, count, remove')(
             io.insert_account_transaction,
             io.update_account_transaction,

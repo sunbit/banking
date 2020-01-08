@@ -66,7 +66,7 @@ def encode_date(dt):
     return dt.strftime('%d/%m/%Y')
 
 
-@retry(exceptions=(TimeoutException, WebDriverException), logger=logger)
+@retry(exceptions=(TimeoutException, WebDriverException, SMSOTPException), logger=logger)
 def login(browser, username, password):
     log('Loading BBVA main page')
     browser.get('https://www.bbva.es')
@@ -94,6 +94,47 @@ def login(browser, username, password):
         log('Popup closed')
     else:
         log('No popups found')
+
+    # Fill SMS OTP if any
+    log('Waiting for code request, if any')
+    code_request_input = browser.find_element_by_css_selector('input[name=otp][type=password]', visible=True, timeout=15, do_raise=False)
+
+    if code_request_input:
+        received_code = None
+
+        t0 = int(time.time())
+
+        def sms_timeout():
+            return (int(time.time()) - t0) > SMS_TIMEOUT
+
+        while not received_code and not sms_timeout():
+            log('Waiting for SMS code')
+            access_code = database.get_bank_access_code(
+                database.load(env()['database_folder']),
+                load_config(env()['main_config_file']).banks['bbva']
+            )
+            if access_code is None:
+                time.sleep(0.5)
+                continue
+
+            age = (datetime.utcnow() - access_code.date).total_seconds()
+            if age < 30:
+                log('Valid SMS code arrived! {} seconds old'.format(age))
+                received_code = access_code.code
+            time.sleep(0.5)
+
+        if received_code is None:
+            log('No recent SMS code received')
+            raise SMSOTPException('No SMS received in time')
+        if received_code:
+            log('Submitting SMS code')
+            code_request_input.focus().clear().send_keys(received_code)
+            browser.find_element_by_css_selector('#cuentas_buscador_firma input[type=submit]').click()
+    else:
+        log('No code requested or already entered recently')
+
+
+
 
     log('Waiting login to finish')
     browser.find_element_by_css_selector('#t-main-content', visible=True, timeout=20)

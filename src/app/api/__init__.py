@@ -73,6 +73,26 @@ class AccountAccessCode(Resource):
         code = request.get_json()['code']
 
         account = account_from_config(banking_configuration.accounts[account_id])
-        access_code = datatypes.AccessCode(code=code, date=datetime.utcnow(), account_id=account.id)
+        access_code = datatypes.AccountAccessCode(code=code, date=datetime.utcnow(), account_id=account.id)
         database.update_account_access_code(db, account, access_code)
+        return jsonify(io.encode_object(access_code))
+
+
+class BankAccessCode(Resource):
+    def get(self, bank_id):
+        banking_configuration = bank.load_config(bank.env()['main_config_file'])
+        db = database.load(bank.env()['database_folder'])
+
+        bank_config = banking_configuration.banks[bank_id]
+        access_code = database.get_bank_access_code(db, bank_config)
+        return jsonify(io.encode_object(access_code))
+
+    def put(self, bank_id):
+        banking_configuration = bank.load_config(bank.env()['main_config_file'])
+        db = database.load(bank.env()['database_folder'])
+        code = request.get_json()['code']
+
+        bank_config = banking_configuration.banks[bank_id]
+        access_code = datatypes.BankAccessCode(code=code, date=datetime.utcnow(), bank_id=bank_config.id)
+        database.update_bank_access_code(db, bank_config, access_code)
         return jsonify(io.encode_object(access_code))

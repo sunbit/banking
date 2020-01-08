@@ -269,7 +269,7 @@ def get_last_update_time(metadata, bank, account_type, identifier):
 
 
 def set_last_update_time(metadata, bank, account_type, identifier, date):
-    _metadata = deepcopy(metadata)
+    _metadata = deepcopy(metadata) if metadata is not None else {}
     bank_level = _metadata.setdefault(bank, {})
     type_level = bank_level.setdefault(account_type, {})
     account_level = type_level.setdefault(identifier, {})
@@ -295,7 +295,7 @@ def update_all(banking_config, env):
 
         elapsed = (datetime.utcnow() - last_update).seconds
         elapsed_hours = int(elapsed / 3600)
-        elapsed_minutes = elapsed - (elapsed_hours * 3600)
+        elapsed_minutes = int((elapsed - (elapsed_hours * 3600)) / 60)
         if elapsed < min_updated_elapsed:
             logger.warning(
                 "Canceling update of {} {} {} as it was updated already {}h:{}m ago".format(
@@ -394,7 +394,7 @@ def update_all(banking_config, env):
                         removed=removed
                     ))
 
-                update_last_update_time(bank_id, 'account', account_number)
+                update_last_update_time(banking_config.accounts[card.account_number].bank_id, 'card', card_number)
 
             except database.DivergedHistoryError as exc:
                 failure.append(EXCEPTION_MESSAGE.format(bank=card_bank, source='card', id=card.number, message=exc.message))

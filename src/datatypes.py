@@ -42,7 +42,15 @@ class SchedulerConfig:
 
 
 @dataclass
-class AccessCode:
+class BankAccessCode:
+    bank_id: str
+    code: str
+    date: str
+    _id: str = None
+
+
+@dataclass
+class AccountAccessCode:
     account_id: str
     code: str
     date: str

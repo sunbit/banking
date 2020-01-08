@@ -205,5 +205,5 @@ def get_credit_card_transactions(browser, card_number, from_date, to_date):
             time.sleep(0.1)
 
     # results already sorted from older to newer, no need to reverse them
-    results = list(chain.from_iterable([response['movimientosTarjeta'] for response in intercepted_responses if response is not None]))
+    results = list(reversed(list(chain.from_iterable([response['movimientosTarjeta'] for response in intercepted_responses if response is not None]))))
     return results

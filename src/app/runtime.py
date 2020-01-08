@@ -16,6 +16,7 @@ def run(banking_config):
 
     rest_api.add_resource(api.AccountsList, '/accounts')
     rest_api.add_resource(api.Account, '/accounts/<account_id>')
+    rest_api.add_resource(api.BankAccessCode, '/banks/<bank_id>/access_code')
     rest_api.add_resource(api.AccountTransactions, '/accounts/<account_id>/transactions')
     rest_api.add_resource(api.AccountAccessCode, '/accounts/<account_id>/access_code')
 
