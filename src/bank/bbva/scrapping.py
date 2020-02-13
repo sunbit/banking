@@ -86,7 +86,7 @@ def login(browser, username, password):
     browser.find_element_by_name('password').focus().clear().send_keys(password)
 
     log('Submitting login')
-    browser.find_element_by_css_selector("button[type=submit]").click()
+    browser.find_element_by_css_selector("button[type=submit]").forced_click()
 
     # Fill SMS OTP if any
     log('Waiting for code request, if any')
