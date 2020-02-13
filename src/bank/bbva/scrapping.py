@@ -80,13 +80,17 @@ def login(browser, username, password):
     log('Filling login form')
     browser.driver.switch_to_frame(browser.find_element_by_id('tab-personas-iframe').result)
     browser.find_element_by_name('user', visible=True)
-    # Even with waiting for visible, still get some bad inputs
+
+    # Even with waiting for visible, still get some misses sometimes
+    user_input = browser.find_element_by_name('user', visible=True)
     time.sleep(2)
-    browser.find_element_by_name('user').focus().clear().send_keys(username)
-    browser.find_element_by_name('password').focus().clear().send_keys(password)
+    user_input.focus().clear().send_keys(username)
+
+    password_input = browser.find_element_by_name('password', visible=True)
+    password_input.focus().clear().send_keys(password)
 
     log('Submitting login')
-    browser.find_element_by_css_selector("button[type=submit]").forced_click()
+    browser.find_element_by_css_selector("button[type=submit]").focus().forced_click()
 
     # Fill SMS OTP if any
     log('Waiting for code request, if any')
