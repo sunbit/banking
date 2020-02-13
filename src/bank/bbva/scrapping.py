@@ -75,7 +75,7 @@ def login(browser, username, password):
         gdpr_button[0].click()
 
     log('Opening login form')
-    browser.find_element_by_css_selector('.header__actions .header__access').click()
+    browser.find_element_by_css_selector('.header__actions .header__access').forced_click()
 
     log('Filling login form')
     browser.driver.switch_to_frame(browser.find_element_by_id('tab-personas-iframe').result)
