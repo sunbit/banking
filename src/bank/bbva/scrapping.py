@@ -70,7 +70,9 @@ def encode_date(dt):
 def login(browser, username, password):
     log('Loading BBVA main page')
     browser.get('https://www.bbva.es')
-    browser.find_elements_by_css_selector('.cookiesgdpr button').filter(lambda button: 'aceptar' in button.text.lower())[0].click()
+    gdpr_button = browser.find_elements_by_css_selector('.cookiesgdpr button').filter(lambda button: 'aceptar' in button.text.lower())
+    if gdpr_button:
+        gdpr_button[0].click()
 
     log('Opening login form')
     browser.find_element_by_css_selector('.header__actions .header__access').click()
@@ -79,7 +81,7 @@ def login(browser, username, password):
     browser.driver.switch_to_frame(browser.find_element_by_id('tab-personas-iframe').result)
     browser.find_element_by_name('user', visible=True)
     # Even with waiting for visible, still get some bad inputs
-    time.sleep(1)
+    time.sleep(2)
     browser.find_element_by_name('user').focus().clear().send_keys(username)
     browser.find_element_by_name('password').focus().clear().send_keys(password)
 
