@@ -79,11 +79,9 @@ def login(browser, username, password):
 
     log('Filling login form')
     browser.driver.switch_to_frame(browser.find_element_by_id('tab-personas-iframe').result)
-    browser.find_element_by_name('user', visible=True)
 
     # Even with waiting for visible, still get some misses sometimes
-    user_input = browser.find_element_by_name('user', visible=True)
-    time.sleep(2)
+    user_input = browser.find_element_by_name('user', timeout=15, visible=True)
     user_input.focus().clear().send_keys(username)
 
     password_input = browser.find_element_by_name('password', visible=True)
