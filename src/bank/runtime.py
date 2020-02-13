@@ -288,7 +288,7 @@ def update_all(banking_config, env):
     def already_updated(bank_id, account_type, account_number):
         last_update = get_last_update_time(
             get_metadata(metadata_file),
-            bank_id, 'account', account_number
+            bank_id, account_type, account_number
         )
         if last_update is None:
             return False
